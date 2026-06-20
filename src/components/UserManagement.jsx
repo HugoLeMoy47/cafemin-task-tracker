@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../supabaseClient'
+import { validateEmail, validatePassword } from '../utils/validation'
 
 const ROLES = ['Administrador', 'Gestor', 'Asignado']
 
@@ -47,6 +48,17 @@ export default function UserManagement() {
     setCreating(true)
     setCreateError('')
     setSuccessMsg('')
+
+    if (!validateEmail(form.correo)) {
+      setCreateError('El correo no tiene un formato válido.')
+      setCreating(false)
+      return
+    }
+    if (!validatePassword(form.password)) {
+      setCreateError('La contraseña debe tener al menos 6 caracteres.')
+      setCreating(false)
+      return
+    }
 
     const { data, error: signUpError } = await transientClient.auth.signUp({
       email: form.correo.trim(),

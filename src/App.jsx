@@ -73,8 +73,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-500">Cargando...</div>
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-gray-500 dark:text-gray-400">Cargando...</div>
       </div>
     )
   }
@@ -86,16 +86,16 @@ export default function App() {
 
   if (!userProfile) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-md max-w-sm">
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-md max-w-sm">
           <div className="text-4xl mb-4">⏳</div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Cuenta pendiente de activación</h2>
-          <p className="text-gray-500 text-sm mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Cuenta pendiente de activación</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             Tu registro fue recibido. El administrador necesita asignarte un rol para que puedas acceder.
           </p>
           <button
             onClick={() => supabase.auth.signOut()}
-            className="text-blue-600 hover:underline text-sm"
+            className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             Cerrar sesión
           </button>

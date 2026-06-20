@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../supabaseClient'
+import { validateImageFile } from '../utils/validation'
 
 const COLUMNS = [
   {
@@ -136,6 +137,8 @@ function PhotoModal({ task, onSuccess, onCancel }) {
   async function handleFile(e) {
     const file = e.target.files[0]
     if (!file) return
+    const fileError = validateImageFile(file)
+    if (fileError) { setError(fileError); return }
     setUploading(true)
     setError('')
     const ext = file.name.split('.').pop()
@@ -159,7 +162,7 @@ function PhotoModal({ task, onSuccess, onCancel }) {
           Para mover <span className="font-medium text-gray-700 dark:text-gray-200">"{task.nombre}"</span> a Hecho necesitas subir una foto.
         </p>
         {error && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{error}</p>}
-        <input type="file" accept="image/*" ref={fileRef} onChange={handleFile} className="hidden" />
+        <input type="file" accept="image/jpeg,image/png,image/webp" ref={fileRef} onChange={handleFile} className="hidden" />
         <div className="flex gap-3">
           <button
             onClick={() => fileRef.current.click()}
@@ -185,6 +188,7 @@ export default function KanbanBoard({ userProfile }) {
   const [loading, setLoading] = useState(true)
   const [activeTask, setActiveTask] = useState(null)
   const [photoTask, setPhotoTask] = useState(null)
+  const [dragError, setDragError] = useState('')
 
   const fetchTasks = useCallback(async () => {
     const { data, error } = await supabase
@@ -225,8 +229,14 @@ export default function KanbanBoard({ userProfile }) {
       return
     }
 
+    const previousTasks = tasks
+    setDragError('')
     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, estado: newEstado } : t)))
-    await supabase.from('tareas').update({ estado: newEstado }).eq('id', task.id)
+    const { error } = await supabase.from('tareas').update({ estado: newEstado }).eq('id', task.id)
+    if (error) {
+      setTasks(previousTasks)
+      setDragError('No se pudo actualizar el estado. Intenta de nuevo.')
+    }
   }
 
   async function handlePhotoSuccess() {
@@ -260,6 +270,12 @@ export default function KanbanBoard({ userProfile }) {
           Arrastra las tarjetas para cambiar el estado
         </span>
       </div>
+
+      {dragError && (
+        <div className="mb-4 px-4 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm">
+          {dragError}
+        </div>
+      )}
 
       <div className="overflow-x-auto pb-2">
         <div className="flex gap-4 min-w-[480px]">

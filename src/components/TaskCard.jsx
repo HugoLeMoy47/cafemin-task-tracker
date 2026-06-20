@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../supabaseClient'
+import { validateImageFile } from '../utils/validation'
 
 const ESTADO_STYLE = {
   Pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700',
@@ -45,6 +46,8 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
   async function handlePhotoUpload(e) {
     const file = e.target.files[0]
     if (!file) return
+    const fileError = validateImageFile(file)
+    if (fileError) { setError(fileError); return }
     setUploading(true)
     setError('')
     const ext = file.name.split('.').pop()
@@ -176,7 +179,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
           <p className="text-sm text-orange-700 dark:text-orange-300 font-medium mb-2">
             Se requiere foto de evidencia para marcar como Hecho.
           </p>
-          <input type="file" accept="image/*" ref={fileRef} onChange={handlePhotoUpload} className="hidden" />
+          <input type="file" accept="image/jpeg,image/png,image/webp" ref={fileRef} onChange={handlePhotoUpload} className="hidden" />
           <div className="flex gap-2">
             <button
               onClick={() => fileRef.current.click()}
