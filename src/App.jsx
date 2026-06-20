@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import Navbar from './components/Navbar'
 import TaskList from './components/TaskList'
+import KanbanBoard from './components/KanbanBoard'
 import TaskForm from './components/TaskForm'
 import UserManagement from './components/UserManagement'
 import CatalogManagement from './components/CatalogManagement'
@@ -98,11 +99,15 @@ export default function App() {
       />
       <main className="max-w-5xl mx-auto px-4 py-6">
         {currentView === 'tasks' && (
-          <TaskList
-            userProfile={userProfile}
-            onEdit={handleEdit}
-            onNew={handleNew}
-          />
+          isAdmin || isGestor ? (
+            <TaskList
+              userProfile={userProfile}
+              onEdit={handleEdit}
+              onNew={handleNew}
+            />
+          ) : (
+            <KanbanBoard userProfile={userProfile} />
+          )
         )}
         {currentView === 'form' && (
           <TaskForm
