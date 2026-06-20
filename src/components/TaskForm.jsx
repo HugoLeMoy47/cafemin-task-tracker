@@ -10,6 +10,9 @@ export default function TaskForm({ task, userProfile, onDone }) {
   const [asignadoId, setAsignadoId] = useState(task?.asignado_id || '')
   const [categoriaId, setCategoriaId] = useState(task?.categoria_id || '')
   const [areaId, setAreaId] = useState(task?.area_trabajo_id || '')
+  const [fechaLimite, setFechaLimite] = useState(
+    task?.fecha_limite ? task.fecha_limite.split('T')[0] : ''
+  )
 
   const [usuarios, setUsuarios] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -43,6 +46,7 @@ export default function TaskForm({ task, userProfile, onDone }) {
       asignado_id: asignadoId || null,
       categoria_id: categoriaId || null,
       area_trabajo_id: areaId || null,
+      fecha_limite: fechaLimite || null,
     }
 
     let err
@@ -141,6 +145,16 @@ export default function TaskForm({ task, userProfile, onDone }) {
               <option key={u.id} value={u.id}>{u.nombre_completo}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha límite</label>
+          <input
+            type="date"
+            value={fechaLimite}
+            onChange={(e) => setFechaLimite(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         <div className="flex items-center gap-3">

@@ -14,7 +14,7 @@ const ESTADO_STYLE = {
   Hecho: 'bg-green-100 text-green-700',
 }
 
-export default function Reports() {
+export default function Reports({ userProfile }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('Por Estado')
@@ -170,11 +170,14 @@ export default function Reports() {
                 <th className="text-left px-4 py-3 text-xs text-gray-500">Estado</th>
                 <th className="text-left px-4 py-3 text-xs text-gray-500">Asignado</th>
                 <th className="text-left px-4 py-3 text-xs text-gray-500">Creada</th>
+                <th className="text-left px-4 py-3 text-xs text-gray-500">Límite</th>
                 <th className="text-left px-4 py-3 text-xs text-gray-500">Hecho</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {byFecha.map((t) => (
+              {byFecha.map((t) => {
+                const overdue = t.fecha_limite && t.estado !== 'Hecho' && new Date(t.fecha_limite) < new Date()
+                return (
                 <tr key={t.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 font-medium text-gray-800">{t.nombre}</td>
                   <td className="px-4 py-2.5">
@@ -184,9 +187,13 @@ export default function Reports() {
                   </td>
                   <td className="px-4 py-2.5 text-gray-500">{t.asignado?.nombre_completo || '—'}</td>
                   <td className="px-4 py-2.5 text-gray-500">{formatDate(t.fecha_creacion)}</td>
+                  <td className={`px-4 py-2.5 ${overdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                    {t.fecha_limite ? formatDate(t.fecha_limite) : '—'}
+                  </td>
                   <td className="px-4 py-2.5 text-gray-500">{formatDate(t.fecha_hecho)}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
           {byFecha.length === 0 && (

@@ -66,6 +66,9 @@ export default function App() {
 
   if (!session) return <Login />
 
+  const isAdmin = userProfile?.rol === 'Administrador'
+  const isGestor = userProfile?.rol === 'Gestor'
+
   if (!userProfile) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -108,9 +111,9 @@ export default function App() {
             onDone={handleFormDone}
           />
         )}
-        {currentView === 'users' && <UserManagement />}
-        {currentView === 'catalogs' && <CatalogManagement />}
-        {currentView === 'reports' && <Reports userProfile={userProfile} />}
+        {currentView === 'users' && isAdmin && <UserManagement />}
+        {currentView === 'catalogs' && isAdmin && <CatalogManagement />}
+        {currentView === 'reports' && (isAdmin || isGestor) && <Reports userProfile={userProfile} />}
       </main>
     </div>
   )

@@ -35,6 +35,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
   const canEdit = isAdmin || isGestor
   const canDelete = isAdmin
   const canChangeStatus = canEdit || task.asignado_id === userProfile.id
+  const isOverdue = task.fecha_limite && task.estado !== 'Hecho' && new Date(task.fecha_limite) < new Date()
 
   const nextStatus = NEXT_STATUS[task.estado]
   const prevStatus = PREV_STATUS[task.estado]
@@ -82,8 +83,9 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
 
   async function handleDelete() {
     if (!window.confirm('¿Eliminar esta tarea?')) return
-    await supabase.from('tareas').delete().eq('id', task.id)
-    onRefresh()
+    const { error } = await supabase.from('tareas').delete().eq('id', task.id)
+    if (error) setError(error.message)
+    else onRefresh()
   }
 
   return (
@@ -135,6 +137,11 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
         {task.area && <span>📍 {task.area.nombre}</span>}
         <span>📅 {formatDate(task.fecha_creacion)}</span>
         {task.fecha_hecho && <span>✅ Hecho: {formatDate(task.fecha_hecho)}</span>}
+        {task.fecha_limite && (
+          <span className={isOverdue ? 'text-red-600 font-semibold' : ''}>
+            {isOverdue ? '⚠️ Vencida:' : '⏰ Límite:'} {formatDate(task.fecha_limite)}
+          </span>
+        )}
       </div>
 
       {/* Evidencia foto */}

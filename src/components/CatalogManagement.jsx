@@ -4,15 +4,17 @@ import { supabase } from '../supabaseClient'
 function CatalogSection({ title, table }) {
   const [items, setItems] = useState([])
   const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function fetch() {
+  async function fetchItems() {
     const { data } = await supabase.from(table).select('*').order('nombre')
     setItems(data || [])
   }
 
-  useEffect(() => { fetch() }, [table])
+  useEffect(() => { fetchItems() }, [table])
 
   async function addItem(e) {
     e.preventDefault()
@@ -21,7 +23,17 @@ function CatalogSection({ title, table }) {
     setError('')
     const { error } = await supabase.from(table).insert({ nombre: newName.trim() })
     if (error) setError(error.message)
-    else { setNewName(''); fetch() }
+    else { setNewName(''); fetchItems() }
+    setLoading(false)
+  }
+
+  async function updateItem(id) {
+    if (!editName.trim()) return
+    setLoading(true)
+    setError('')
+    const { error } = await supabase.from(table).update({ nombre: editName.trim() }).eq('id', id)
+    if (error) setError(error.message)
+    else { setEditingId(null); fetchItems() }
     setLoading(false)
   }
 
@@ -29,7 +41,7 @@ function CatalogSection({ title, table }) {
     if (!window.confirm(`¿Eliminar "${nombre}"?`)) return
     const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) setError(error.message)
-    else fetch()
+    else fetchItems()
   }
 
   return (
@@ -43,13 +55,49 @@ function CatalogSection({ title, table }) {
       <ul className="space-y-2 mb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-50">
-            <span className="text-sm text-gray-800">{item.nombre}</span>
-            <button
-              onClick={() => deleteItem(item.id, item.nombre)}
-              className="text-xs text-red-500 hover:text-red-700 ml-4"
-            >
-              Eliminar
-            </button>
+            {editingId === item.id ? (
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && updateItem(item.id)}
+                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <button
+                  onClick={() => updateItem(item.id)}
+                  disabled={loading}
+                  className="text-xs text-green-600 hover:text-green-800 font-medium"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="text-sm text-gray-800">{item.nombre}</span>
+                <div className="flex items-center gap-3 ml-4">
+                  <button
+                    onClick={() => { setEditingId(item.id); setEditName(item.nombre) }}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => deleteItem(item.id, item.nombre)}
+                    className="text-xs text-red-500 hover:text-red-700"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </>
+            )}
           </li>
         ))}
         {items.length === 0 && (

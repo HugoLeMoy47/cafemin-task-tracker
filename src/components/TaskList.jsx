@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import TaskCard from './TaskCard'
 
 const ESTADOS = ['Todos', 'Pendiente', 'En curso', 'Hecho']
+const PAGE_SIZE = 20
 
 const ESTADO_COUNT_STYLE = {
   Pendiente: 'bg-yellow-100 text-yellow-700',
@@ -14,6 +15,7 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
   const [tasks, setTasks] = useState([])
   const [filter, setFilter] = useState('Todos')
   const [loading, setLoading] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const canCreate = ['Administrador', 'Gestor'].includes(userProfile.rol)
 
@@ -37,7 +39,26 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
     fetchTasks()
   }, [fetchTasks])
 
+  // Suscripción en tiempo real
+  useEffect(() => {
+    const channel = supabase
+      .channel('tareas-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, () => {
+        fetchTasks()
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [fetchTasks])
+
+  // Reiniciar paginación al cambiar filtro
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [filter])
+
   const filtered = filter === 'Todos' ? tasks : tasks.filter((t) => t.estado === filter)
+  const visible = filtered.slice(0, visibleCount)
+  const hasMore = filtered.length > visibleCount
 
   const counts = tasks.reduce((acc, t) => {
     acc[t.estado] = (acc[t.estado] || 0) + 1
@@ -100,17 +121,30 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
           {filter === 'Todos' ? 'No hay tareas aún.' : `No hay tareas en estado "${filter}".`}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              userProfile={userProfile}
-              onRefresh={fetchTasks}
-              onEdit={() => onEdit(task)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {visible.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                userProfile={userProfile}
+                onRefresh={fetchTasks}
+                onEdit={() => onEdit(task)}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="mt-5 text-center">
+              <button
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                className="px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Cargar más ({filtered.length - visibleCount} restantes)
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
