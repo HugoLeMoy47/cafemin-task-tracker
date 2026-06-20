@@ -5,6 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CAFEMIN – Seguidor de Tareas</title>
+    <script>
+      // Aplica dark mode antes del primer render para evitar flash blanco
+      if (localStorage.getItem('darkMode') === 'true' ||
+         (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

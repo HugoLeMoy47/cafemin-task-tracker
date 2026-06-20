@@ -6,9 +6,9 @@ const ESTADOS = ['Todos', 'Pendiente', 'En curso', 'Hecho']
 const PAGE_SIZE = 20
 
 const ESTADO_COUNT_STYLE = {
-  Pendiente: 'bg-yellow-100 text-yellow-700',
-  'En curso': 'bg-blue-100 text-blue-700',
-  Hecho: 'bg-green-100 text-green-700',
+  Pendiente: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  'En curso': 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  Hecho: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
 }
 
 export default function TaskList({ userProfile, onEdit, onNew }) {
@@ -35,11 +35,8 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+  useEffect(() => { fetchTasks() }, [fetchTasks])
 
-  // Suscripción en tiempo real
   useEffect(() => {
     const channel = supabase
       .channel('tareas-realtime')
@@ -47,14 +44,10 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
         fetchTasks()
       })
       .subscribe()
-
     return () => supabase.removeChannel(channel)
   }, [fetchTasks])
 
-  // Reiniciar paginación al cambiar filtro
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
-  }, [filter])
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filter])
 
   const filtered = filter === 'Todos' ? tasks : tasks.filter((t) => t.estado === filter)
   const visible = filtered.slice(0, visibleCount)
@@ -69,7 +62,7 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-xl font-semibold text-gray-800">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
           {userProfile.rol === 'Asignado' ? 'Mis Tareas' : 'Todas las Tareas'}
         </h2>
         {canCreate && (
@@ -96,28 +89,30 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 mb-5 border-b border-gray-200">
-        {ESTADOS.map((e) => (
-          <button
-            key={e}
-            onClick={() => setFilter(e)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              filter === e
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {e}
-          </button>
-        ))}
+      {/* Filter tabs — scroll horizontal en móvil */}
+      <div className="overflow-x-auto -mx-1 px-1 mb-5">
+        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 min-w-max">
+          {ESTADOS.map((e) => (
+            <button
+              key={e}
+              onClick={() => setFilter(e)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                filter === e
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Task list */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Cargando tareas...</div>
+        <div className="text-center py-12 text-gray-400 dark:text-gray-500">Cargando tareas...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-gray-400 dark:text-gray-500">
           {filter === 'Todos' ? 'No hay tareas aún.' : `No hay tareas en estado "${filter}".`}
         </div>
       ) : (
@@ -138,7 +133,7 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
             <div className="mt-5 text-center">
               <button
                 onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                className="px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                className="px-5 py-2 text-sm text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
               >
                 Cargar más ({filtered.length - visibleCount} restantes)
               </button>

@@ -70,6 +70,31 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 | `users` | `UserManagement` | Administrador |
 | `catalogs` | `CatalogManagement` | Administrador |
 
+## Dark mode
+
+- Strategy: Tailwind `darkMode: 'class'` — the `dark` class is toggled on `<html>` by `App.jsx`.
+- State is read from `localStorage` on first render (lazy initializer in `useState`). If no preference is stored, falls back to `window.matchMedia('(prefers-color-scheme: dark)')`.
+- DOM sync is handled in a `useEffect` watching `darkMode` state — **not** inside the state setter. This is the correct React pattern.
+- An anti-flash `<script>` in `index.html` applies the `dark` class before React hydrates, preventing a white flash on page load.
+- Toggle button lives in `Navbar.jsx` and calls `onToggleDark` prop from `App.jsx`.
+- All components use `dark:` Tailwind variants for backgrounds, text, borders, and badges.
+
+## Mobile responsiveness
+
+- Tailwind breakpoints: `sm:` (640 px) is the primary mobile/desktop split.
+- `Navbar.jsx`: hamburger icon (`flex sm:hidden`) toggles a dropdown menu; desktop nav items are `hidden sm:flex`.
+- Tables in `UserManagement`, `Reports`, and `TaskList`: wrapped in `overflow-x-auto` div; tables have `min-w-[480px]` to prevent collapsing.
+- `KanbanBoard`: the three-column layout is wrapped in `overflow-x-auto` with `min-w-[480px]` so it scrolls horizontally on narrow screens.
+- Forms use `grid-cols-1 sm:grid-cols-2` for two-column layout on wider screens.
+- Action buttons stack vertically on mobile using `flex-col sm:flex-row`.
+
+## Footer
+
+- A `<footer>` element lives inside `App.jsx`, after `<main>`, inside the root wrapper div.
+- Root wrapper uses `flex flex-col min-h-screen`; `<main>` has `flex-1` so content pushes the footer to the bottom.
+- Footer displays: `© 2026 Freejolitos Consultores. Todos los derechos reservados.`
+- Styled with `border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`.
+
 ## Kanban board
 
 `KanbanBoard.jsx` uses `@dnd-kit/core` and `@dnd-kit/utilities`:

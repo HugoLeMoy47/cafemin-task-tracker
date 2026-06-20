@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import Navbar from './components/Navbar'
@@ -15,6 +15,20 @@ export default function App() {
   const [currentView, setCurrentView] = useState('tasks')
   const [editingTask, setEditingTask] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [darkMode, setDarkMode] = useState(() => {
+    const stored = localStorage.getItem('darkMode')
+    return stored !== null
+      ? stored === 'true'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  // Sincroniza el estado con la clase en <html> y localStorage
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+    localStorage.setItem('darkMode', String(darkMode))
+  }, [darkMode])
+
+  const toggleDarkMode = useCallback(() => setDarkMode((prev) => !prev), [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -91,13 +105,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar
         userProfile={userProfile}
         currentView={currentView}
         setCurrentView={setCurrentView}
+        darkMode={darkMode}
+        onToggleDark={toggleDarkMode}
       />
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6">
         {currentView === 'tasks' && (
           isAdmin || isGestor ? (
             <TaskList
@@ -120,6 +136,11 @@ export default function App() {
         {currentView === 'catalogs' && isAdmin && <CatalogManagement />}
         {currentView === 'reports' && (isAdmin || isGestor) && <Reports userProfile={userProfile} />}
       </main>
+      <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-3">
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+          © 2026 Freejolitos Consultores. Todos los derechos reservados.
+        </p>
+      </footer>
     </div>
   )
 }

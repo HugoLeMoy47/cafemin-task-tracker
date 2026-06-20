@@ -29,6 +29,8 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 | 📊 **Reportes** | Agrupados por estado, por asignado o por fecha de creación |
 | 🗂 **Catálogos** | CRUD de categorías y áreas de trabajo con edición inline |
 | ⚡ **Tiempo real** | Los cambios de otros usuarios se reflejan automáticamente |
+| 📱 **Diseño responsivo** | Interfaz optimizada para móvil y escritorio; menú hamburguesa en pantallas pequeñas |
+| 🌙 **Modo oscuro** | Alterna entre tema claro y oscuro; persiste entre sesiones y respeta la preferencia del sistema |
 
 ### 🎭 Roles
 
@@ -152,6 +154,8 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 | 📊 **Reports** | Grouped by status, by assignee, or by creation date |
 | 🗂 **Catalogs** | CRUD for categories and work areas with inline editing |
 | ⚡ **Real-time** | Changes from other users appear automatically |
+| 📱 **Responsive design** | Mobile-first layout; hamburger menu on small screens, scrollable tables |
+| 🌙 **Dark mode** | Toggle between light and dark themes; persists across sessions and respects system preference |
 
 ### 🎭 Roles
 
