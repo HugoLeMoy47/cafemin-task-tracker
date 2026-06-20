@@ -20,11 +20,12 @@ const tdBase = 'px-4 py-2.5'
 export default function Reports({ userProfile }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState('')
   const [tab, setTab] = useState('Por Estado')
 
   useEffect(() => {
     async function fetchAll() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('tareas')
         .select(`
           *,
@@ -33,13 +34,23 @@ export default function Reports({ userProfile }) {
           area:areas_trabajo(nombre)
         `)
         .order('fecha_creacion', { ascending: false })
-      setTasks(data || [])
+      if (error) {
+        setFetchError('No se pudieron cargar los reportes. Verifica tu conexión.')
+      } else {
+        setTasks(data || [])
+      }
       setLoading(false)
     }
     fetchAll()
   }, [])
 
   if (loading) return <div className="text-center py-12 text-gray-400 dark:text-gray-500">Cargando reportes...</div>
+
+  if (fetchError) return (
+    <div className="px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm">
+      {fetchError}
+    </div>
+  )
 
   const byEstado = ['Pendiente', 'En curso', 'Hecho'].map((estado) => ({
     estado,

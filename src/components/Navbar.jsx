@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 
 const ROL_BADGE = {
@@ -9,8 +9,24 @@ const ROL_BADGE = {
 
 export default function Navbar({ userProfile, currentView, setCurrentView, darkMode, onToggleDark }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const headerRef = useRef()
   const isAdmin = userProfile.rol === 'Administrador'
   const isGestor = userProfile.rol === 'Gestor'
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleOutsideClick(e) {
+      if (headerRef.current && !headerRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('touchstart', handleOutsideClick)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('touchstart', handleOutsideClick)
+    }
+  }, [menuOpen])
 
   const navItems = [
     { id: 'tasks',    label: 'Tareas',     show: true },
@@ -25,7 +41,7 @@ export default function Navbar({ userProfile, currentView, setCurrentView, darkM
   }
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
+    <header ref={headerRef} className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
 
         {/* Logo */}

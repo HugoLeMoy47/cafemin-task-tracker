@@ -76,7 +76,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm dark:hover:shadow-gray-900 transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -118,6 +118,9 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
       {/* Metadata */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
         {task.asignado && <span>👤 {task.asignado.nombre_completo}</span>}
+        {task.creador && task.creador.nombre_completo !== task.asignado?.nombre_completo && (
+          <span>✏️ {task.creador.nombre_completo}</span>
+        )}
         {task.categoria && <span>🏷 {task.categoria.nombre}</span>}
         {task.area && <span>📍 {task.area.nombre}</span>}
         <span>📅 {formatDate(task.fecha_creacion)}</span>

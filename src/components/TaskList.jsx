@@ -16,6 +16,7 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
   const [filter, setFilter] = useState('Todos')
   const [loading, setLoading] = useState(true)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [fetchError, setFetchError] = useState('')
 
   const canCreate = ['Administrador', 'Gestor'].includes(userProfile.rol)
 
@@ -26,12 +27,18 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
       .select(`
         *,
         asignado:usuarios!asignado_id(id, nombre_completo, rol),
+        creador:usuarios!creado_por(nombre_completo),
         categoria:categorias(nombre),
         area:areas_trabajo(nombre)
       `)
       .order('fecha_creacion', { ascending: false })
 
-    if (!error) setTasks(data || [])
+    if (error) {
+      setFetchError('No se pudieron cargar las tareas. Verifica tu conexión.')
+    } else {
+      setFetchError('')
+      setTasks(data || [])
+    }
     setLoading(false)
   }, [])
 
@@ -107,6 +114,12 @@ export default function TaskList({ userProfile, onEdit, onNew }) {
           ))}
         </div>
       </div>
+
+      {fetchError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm">
+          {fetchError}
+        </div>
+      )}
 
       {/* Task list */}
       {loading ? (

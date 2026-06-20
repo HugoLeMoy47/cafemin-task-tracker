@@ -199,7 +199,11 @@ export default function KanbanBoard({ userProfile }) {
         area:areas_trabajo(nombre)
       `)
       .order('fecha_creacion', { ascending: false })
-    if (!error) setTasks(data || [])
+    if (error) {
+      setDragError('No se pudieron cargar las tareas. Verifica tu conexión.')
+    } else {
+      setTasks(data || [])
+    }
     setLoading(false)
   }, [])
 
