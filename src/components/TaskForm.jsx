@@ -26,11 +26,12 @@ export default function TaskForm({ task, userProfile, onDone }) {
 
   useEffect(() => {
     async function loadOptions() {
-      const [{ data: u }, { data: c }, { data: a }] = await Promise.all([
+      const [{ data: u, error: eu }, { data: c, error: ec }, { data: a, error: ea }] = await Promise.all([
         supabase.from('usuarios').select('id, nombre_completo').order('nombre_completo'),
         supabase.from('categorias').select('id, nombre').order('nombre'),
         supabase.from('areas_trabajo').select('id, nombre').order('nombre'),
       ])
+      if (eu || ec || ea) setError('No se pudieron cargar las opciones del formulario. Verifica tu conexión.')
       setUsuarios(u || [])
       setCategorias(c || [])
       setAreas(a || [])

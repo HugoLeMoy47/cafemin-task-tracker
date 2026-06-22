@@ -15,9 +15,8 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 - `src/components/` — feature components:
   - `Login.jsx` — email/password login and self-registration
   - `Navbar.jsx` — sticky header with role-filtered navigation items
-  - `KanbanBoard.jsx` — drag-and-drop Kanban board shown to Asignado role (uses `@dnd-kit/core`)
-  - `TaskList.jsx` — task list with state filters, realtime subscription, and load-more pagination (Admin/Gestor)
-  - `TaskCard.jsx` — individual task card with status transitions, photo upload, overdue indicator, edit/delete
+  - `KanbanBoard.jsx` — drag-and-drop Kanban board for all roles (uses `@dnd-kit/core`); Admin/Gestor get edit/delete/reopen buttons and a drag handle per card; Asignado gets full-card drag, forward-only transitions
+  - `TaskCard.jsx` — individual task card with status transitions, photo upload, overdue indicator, edit/delete (used in TaskList only, kept for reference)
   - `TaskForm.jsx` — create/edit form with fields: nombre, detalles, asignado, categoría, área, fecha_limite, foto_requerida
   - `UserManagement.jsx` — user creation and role management (Admin only)
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
@@ -25,16 +24,19 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 - `supabase/schema.sql` — full database schema: tables, triggers, RLS policies, seed data
 - `supabase/migrations/add_fecha_limite.sql` — adds `fecha_limite date` column to `tareas`
 - `supabase/migrations/storage_evidencias_policies.sql` — RLS policies for the `evidencias` Storage bucket
+- `supabase/migrations/security_rls_and_stability.sql` — adds `WITH CHECK` to Asignado update policy and `trg_restrict_asignado_update` trigger
 
 ## Database schema
 
 Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`
 
 Key behaviors:
-- `fecha_hecho` is set automatically by a trigger when `estado` changes to `'Hecho'`
+- `fecha_hecho` is set/cleared automatically by trigger `trg_fecha_hecho` when `estado` transitions to/from `'Hecho'`
 - New auth users get a profile row in `usuarios` via the `on_auth_user_created` trigger with role `'Asignado'`
 - `get_my_role()` is a security-definer SQL function used in all RLS policies
 - RLS policies enforce: Admin/Gestor see all tasks; Asignado sees only tasks where `asignado_id = auth.uid()`
+- The `"Asignado update own task"` policy has both `USING` and `WITH CHECK` to prevent self-reassignment
+- Trigger `trg_restrict_asignado_update` enforces at DB level that Asignado can only modify `estado` and `evidencia_url`
 
 ## Storage
 
@@ -49,13 +51,14 @@ Key behaviors:
 
 | Role | Permissions |
 |------|-------------|
-| Administrador | Full access to all views and data; can create users with any role |
-| Gestor | Create/edit tasks, view reports |
-| Asignado | Sees only their own tasks via a Kanban drag-and-drop board |
+| Administrador | Full access to all views and data; can create users with any role; can create/edit/delete/reopen any task on the Kanban |
+| Gestor | Create/edit/reopen tasks, view reports; sees all tasks on the Kanban |
+| Asignado | Sees only their own tasks on the Kanban; can drag cards forward only (Pendiente→En curso→Hecho); cannot reopen from Hecho |
 
-Role guards exist at two levels:
+Role guards exist at three levels:
 1. **Supabase RLS** (authoritative — database enforces access)
-2. **`App.jsx` render guards** (UI layer — prevents rendering unauthorized views)
+2. **DB trigger `trg_restrict_asignado_update`** (column-level enforcement for Asignado updates)
+3. **Client guards in `App.jsx` and `KanbanBoard.jsx`** (UI layer — prevents rendering and invoking unauthorized actions)
 
 ## View routing
 
@@ -63,12 +66,13 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 
 | `currentView` | Component | Roles |
 |---------------|-----------|-------|
-| `tasks` | `KanbanBoard` | Asignado |
-| `tasks` | `TaskList` | Administrador, Gestor |
+| `tasks` | `KanbanBoard` | Todos (comportamiento varía según rol) |
 | `form` | `TaskForm` | Administrador, Gestor |
 | `reports` | `Reports` | Administrador, Gestor |
 | `users` | `UserManagement` | Administrador |
 | `catalogs` | `CatalogManagement` | Administrador |
+
+`KanbanBoard` adapts its behavior based on props: when `onEdit`/`onNew` are passed (Admin/Gestor), cards show a drag handle + action buttons; when omitted (Asignado), the full card is draggable with no action buttons.
 
 ## Dark mode
 
@@ -100,8 +104,12 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 `KanbanBoard.jsx` uses `@dnd-kit/core` and `@dnd-kit/utilities`:
 - Three droppable columns: Pendiente, En curso, Hecho
 - Each task card is a draggable element with optimistic state update on drop
-- If a task requires photo evidence (`foto_requerida = true`), dropping it on "Hecho" opens a photo upload modal before persisting the status change
-- Realtime channel `kanban-tareas` refreshes data on any change to `tareas`
+- **Admin/Gestor cards**: drag handle (`⠿⠿`) initiates drag; remaining card area is clickable for Edit/Delete/Reopen buttons. `onPointerDown` stopPropagation on buttons prevents drag capture.
+- **Asignado cards**: full card is the drag surface; no action buttons rendered
+- Asignado can only drag cards **forward** (Pendiente→En curso→Hecho). Dragging backward from `'Hecho'` is blocked in `handleDragEnd`
+- Admin/Gestor bypass the photo-evidence gate when dragging to `'Hecho'` (gate still applies to Asignado)
+- If a task requires photo evidence (`foto_requerida = true`) and the user is Asignado, dropping on "Hecho" opens a `PhotoModal` before persisting
+- Realtime channel name is unique per component instance (`kanban-tareas-${useId()}`) to prevent duplicate subscriptions on rapid unmount/remount
 
 ## User creation
 
@@ -138,17 +146,21 @@ npm run preview
 ## Security & resilience guidance
 
 - Trust Supabase RLS as the authoritative security boundary.
-- Client-side role checks in `App.jsx` are defense-in-depth only.
+- The `"Asignado update own task"` policy requires both `USING` and `WITH CHECK` — never remove the `WITH CHECK` or it allows self-reassignment.
+- The `trg_restrict_asignado_update` trigger locks Asignado to only `estado`/`evidencia_url` — if adding new updatable columns for Asignado, update the trigger's exclusion list.
+- Client-side role checks in `App.jsx` and `KanbanBoard.jsx` are defense-in-depth only.
 - Validate user input using `src/utils/validation.js` helpers before sending to Supabase.
-- Handle Supabase errors explicitly and surface them to the user — never silently swallow errors.
+- Handle Supabase errors explicitly and surface them to the user — never silently swallow errors. `fetchProfile`, `loadOptions`, and all async handlers must show user-facing messages on failure.
+- Auth initialization uses `onAuthStateChange` only (no `getSession` — it fires `INITIAL_SESSION` synchronously and avoids a concurrent double-fetch race).
 - For admin operations that call `supabase.auth.signUp`, use a transient client with `persistSession: false` to avoid overwriting the current admin session.
 - Keep credentials in `.env` and out of source code.
 
 ## Notes for future agents
 
 - No test suite exists. Adding Vitest + React Testing Library is the recommended next step, starting with `src/utils/validation.js`.
-- Pagination in `TaskList` is client-side (all tasks fetched, then sliced by `visibleCount`). This is intentional for the current scale; revisit if the task volume grows significantly.
+- `TaskList.jsx` is no longer used in the main navigation flow (all roles now use `KanbanBoard`). It is kept for reference but can be removed if the codebase is cleaned up.
 - `KanbanBoard` applies an optimistic update to `tasks` state immediately on drag-end for a responsive feel, then persists to Supabase. Realtime fires afterward and confirms the state.
+- `KanbanBoard` fetches `asignado:usuarios!asignado_id(id, nombre_completo)` to show the assignee name on admin cards. It does not fetch `creado_por` — do not reference `task.creador` inside `KanbanBoard` components.
 - Avoid modifying `node_modules`.
 
 ---

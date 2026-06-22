@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -247,6 +247,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const isAdmin = userProfile?.rol === 'Administrador'
   const isGestor = userProfile?.rol === 'Gestor'
   const isPrivileged = isAdmin || isGestor
+  const instanceId = useId()
 
   const fetchTasks = useCallback(async () => {
     const { data, error } = await supabase
@@ -270,7 +271,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
 
   useEffect(() => {
     const channel = supabase
-      .channel('kanban-tareas')
+      .channel(`kanban-tareas-${instanceId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, fetchTasks)
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -287,7 +288,10 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
     if (!task || task.estado === over.id) return
     const newEstado = over.id
 
-    if (newEstado === 'Hecho' && task.foto_requerida && !task.evidencia_url) {
+    // Asignado cannot reopen completed tasks via drag
+    if (!isPrivileged && task.estado === 'Hecho') return
+
+    if (newEstado === 'Hecho' && task.foto_requerida && !task.evidencia_url && !isPrivileged) {
       setPhotoTask(task)
       return
     }

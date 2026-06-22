@@ -22,8 +22,7 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 |---------------|-------------|
 | 🔐 **Autenticación** | Registro e inicio de sesión por correo/contraseña |
 | 👤 **Gestión de usuarios** | El Admin crea usuarios con rol predefinido o los modifica después |
-| 📋 **Tablero Kanban** | Vista drag-and-drop para el rol Asignado (Pendiente → En curso → Hecho) |
-| 📝 **Lista de tareas** | Vista filtrada con paginación y actualización en tiempo real (Admin/Gestor) |
+| 📋 **Tablero Kanban** | Vista drag-and-drop para todos los roles (Pendiente → En curso → Hecho) |
 | 📅 **Fecha límite** | Campo opcional con alerta visual cuando la tarea está vencida |
 | 📷 **Evidencia fotográfica** | Si se requiere foto, el usuario debe subirla antes de marcar la tarea como Hecha |
 | 📊 **Reportes** | Agrupados por estado, por asignado o por fecha de creación |
@@ -36,9 +35,9 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 
 | Rol | Qué puede hacer |
 |-----|-----------------|
-| **Administrador** | Acceso completo: tareas, usuarios, catálogos y reportes. Crea usuarios con cualquier rol. |
-| **Gestor** | Crea y edita tareas, ve reportes. No administra usuarios ni catálogos. |
-| **Asignado** | Ve sus propias tareas en un tablero Kanban. Cambia el estado arrastrando tarjetas. |
+| **Administrador** | Acceso completo: tareas, usuarios, catálogos y reportes. En el Kanban: crea, edita, elimina y reabre tareas. Ve todas las tareas. |
+| **Gestor** | Crea y edita tareas, ve reportes. En el Kanban: crea y edita tareas, puede reabrirlas. Ve todas las tareas. |
+| **Asignado** | Ve sus propias tareas en el Kanban. Arrastra para cambiar estado (solo avanzar; reabrir requiere admin). |
 
 > Los nuevos usuarios quedan con rol `Asignado` hasta que un Administrador lo cambie desde la vista de Usuarios.
 
@@ -69,6 +68,7 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 1. supabase/schema.sql
 2. supabase/migrations/add_fecha_limite.sql
 3. supabase/migrations/storage_evidencias_policies.sql
+4. supabase/migrations/security_rls_and_stability.sql
 ```
 
 Después de ejecutar el schema, regístrate en la app con tu correo de administrador y luego ejecuta este SQL para asignarte el rol:
@@ -100,8 +100,7 @@ src/
 ├── components/
 │   ├── Login.jsx              # Login y registro por correo/contraseña
 │   ├── Navbar.jsx             # Barra de navegación con menú filtrado por rol
-│   ├── KanbanBoard.jsx        # Tablero drag-and-drop (rol Asignado, usa @dnd-kit)
-│   ├── TaskList.jsx           # Lista con filtros, paginación y realtime (Admin/Gestor)
+│   ├── KanbanBoard.jsx        # Tablero drag-and-drop para todos los roles (usa @dnd-kit)
 │   ├── TaskCard.jsx           # Tarjeta de tarea con acciones, foto y alerta de vencimiento
 │   ├── TaskForm.jsx           # Formulario de creación/edición de tareas
 │   ├── UserManagement.jsx     # Alta y gestión de usuarios (solo Admin)
@@ -114,7 +113,8 @@ supabase/
 ├── schema.sql                 # Tablas, triggers, RLS y datos iniciales
 └── migrations/
     ├── add_fecha_limite.sql               # Columna fecha_limite en tareas
-    └── storage_evidencias_policies.sql    # Políticas RLS del bucket de evidencias
+    ├── storage_evidencias_policies.sql    # Políticas RLS del bucket de evidencias
+    └── security_rls_and_stability.sql    # WITH CHECK Asignado + trigger de columnas
 ```
 
 ### ⚙️ Comandos
@@ -128,7 +128,9 @@ npm run preview  # Vista previa del build de producción
 ### 🔒 Seguridad
 
 - **RLS en todas las tablas**: los permisos se aplican en la base de datos (Supabase RLS), no solo en el cliente.
-- **Guards de rol en cliente**: `App.jsx` también verifica el rol antes de renderizar cada vista, como capa adicional de defensa.
+- **WITH CHECK en políticas UPDATE**: la política de Asignado tiene cláusula `WITH CHECK` para impedir auto-reasignación de tareas.
+- **Trigger de columnas**: el trigger `trg_restrict_asignado_update` restringe al Asignado a solo modificar `estado` y `evidencia_url`, bloqueando cambios a cualquier otro campo a nivel DB.
+- **Guards de rol en cliente**: `App.jsx` y `KanbanBoard.jsx` verifican el rol antes de permitir acciones, como capa adicional de defensa.
 - **Bucket de Storage con RLS**: el bucket `evidencias` tiene políticas explícitas de INSERT, SELECT y DELETE.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
@@ -147,8 +149,7 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 |---------|-------------|
 | 🔐 **Authentication** | Email/password sign-up and login via Supabase Auth |
 | 👤 **User management** | Admin creates users with a preset role or modifies them later |
-| 📋 **Kanban board** | Drag-and-drop view for Assigned users (Pending → In progress → Done) |
-| 📝 **Task list** | Filtered list with pagination and real-time updates (Admin/Manager) |
+| 📋 **Kanban board** | Drag-and-drop view for all roles (Pending → In progress → Done) |
 | 📅 **Due date** | Optional field with visual overdue alert |
 | 📷 **Photo evidence** | If required, the user must upload a photo before marking a task as Done |
 | 📊 **Reports** | Grouped by status, by assignee, or by creation date |
@@ -161,9 +162,9 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 
 | Role | What they can do |
 |------|-----------------|
-| **Administrador** | Full access: tasks, users, catalogs, and reports. Creates users with any role. |
-| **Gestor** | Creates and edits tasks, views reports. Cannot manage users or catalogs. |
-| **Asignado** | Views their own tasks on a Kanban board. Changes status by dragging cards. |
+| **Administrador** | Full access: tasks, users, catalogs, and reports. On the Kanban: create, edit, delete, and reopen tasks. Sees all tasks. |
+| **Gestor** | Creates and edits tasks, views reports. On the Kanban: create, edit, and reopen tasks. Sees all tasks. |
+| **Asignado** | Views their own tasks on the Kanban board. Can drag cards forward only; reopening requires admin. |
 
 > New users start with the `Asignado` role until an Administrator changes it from the Users view.
 
@@ -194,6 +195,7 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 1. supabase/schema.sql
 2. supabase/migrations/add_fecha_limite.sql
 3. supabase/migrations/storage_evidencias_policies.sql
+4. supabase/migrations/security_rls_and_stability.sql
 ```
 
 After running the schema, sign up in the app with your admin email, then run this SQL to grant yourself the Admin role:
@@ -225,8 +227,7 @@ src/
 ├── components/
 │   ├── Login.jsx              # Email/password login and sign-up
 │   ├── Navbar.jsx             # Navigation bar with role-filtered menu
-│   ├── KanbanBoard.jsx        # Drag-and-drop board (Asignado role, uses @dnd-kit)
-│   ├── TaskList.jsx           # List with filters, pagination and realtime (Admin/Gestor)
+│   ├── KanbanBoard.jsx        # Drag-and-drop board for all roles (uses @dnd-kit)
 │   ├── TaskCard.jsx           # Task card with actions, photo upload and overdue alert
 │   ├── TaskForm.jsx           # Task create/edit form
 │   ├── UserManagement.jsx     # User creation and management (Admin only)
@@ -239,7 +240,8 @@ supabase/
 ├── schema.sql                 # Tables, triggers, RLS policies and seed data
 └── migrations/
     ├── add_fecha_limite.sql               # fecha_limite column in tareas
-    └── storage_evidencias_policies.sql    # RLS policies for the evidence bucket
+    ├── storage_evidencias_policies.sql    # RLS policies for the evidence bucket
+    └── security_rls_and_stability.sql    # WITH CHECK for Asignado + column-lock trigger
 ```
 
 ### ⚙️ Commands
@@ -253,7 +255,9 @@ npm run preview  # Preview the production build
 ### 🔒 Security
 
 - **RLS on all tables**: permissions are enforced at the database level (Supabase RLS), not just the client.
-- **Client-side role guards**: `App.jsx` also checks the role before rendering each view as an additional defense layer.
+- **WITH CHECK on UPDATE policies**: the Asignado policy includes a `WITH CHECK` clause to prevent self-reassignment of tasks.
+- **Column-lock trigger**: `trg_restrict_asignado_update` ensures Asignado can only modify `estado` and `evidencia_url` at the DB level, blocking all other field changes.
+- **Client-side role guards**: `App.jsx` and `KanbanBoard.jsx` verify the role before allowing actions, as an additional defense-in-depth layer.
 - **Storage bucket with RLS**: the `evidencias` bucket has explicit INSERT, SELECT and DELETE policies.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.

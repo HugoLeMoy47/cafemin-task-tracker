@@ -125,9 +125,34 @@ create policy "Admin Gestor create tasks" on tareas for insert with check (
 create policy "Admin Gestor update tasks" on tareas for update using (
   get_my_role() in ('Administrador', 'Gestor')
 );
-create policy "Asignado update own task" on tareas for update using (
-  get_my_role() = 'Asignado' and asignado_id = auth.uid()
-);
+create policy "Asignado update own task" on tareas for update
+  using     (get_my_role() = 'Asignado' and asignado_id = auth.uid())
+  with check (get_my_role() = 'Asignado' and asignado_id = auth.uid());
+
+-- Trigger: Asignado solo puede modificar estado y evidencia_url
+create or replace function restrict_asignado_update()
+returns trigger as $$
+begin
+  if get_my_role() = 'Asignado' then
+    if new.nombre           is distinct from old.nombre           or
+       new.detalles         is distinct from old.detalles         or
+       new.foto_requerida   is distinct from old.foto_requerida   or
+       new.asignado_id      is distinct from old.asignado_id      or
+       new.categoria_id     is distinct from old.categoria_id     or
+       new.area_trabajo_id  is distinct from old.area_trabajo_id  or
+       new.creado_por       is distinct from old.creado_por       or
+       new.fecha_limite     is distinct from old.fecha_limite
+    then
+      raise exception 'Asignado solo puede actualizar estado y evidencia_url';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger trg_restrict_asignado_update
+  before update on tareas
+  for each row execute function restrict_asignado_update();
 create policy "Admin delete tasks" on tareas for delete using (
   get_my_role() = 'Administrador'
 );
