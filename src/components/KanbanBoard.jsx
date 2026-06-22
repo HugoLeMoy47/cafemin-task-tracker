@@ -76,30 +76,76 @@ function CardContent({ task }) {
   )
 }
 
-function DraggableCard({ task }) {
+function DraggableCard({ task, isAdmin, isGestor, onEdit, onDelete, onReopen }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: { task },
   })
-
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
+  const isPrivileged = isAdmin || isGestor
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
+      {...(!isPrivileged ? { ...listeners, ...attributes } : {})}
       className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm select-none
-        cursor-grab active:cursor-grabbing transition-shadow
+        transition-shadow
+        ${!isPrivileged ? 'cursor-grab active:cursor-grabbing' : ''}
         ${isDragging ? 'opacity-30' : 'hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600'}`}
     >
+      {isPrivileged && (
+        <div className="flex items-center justify-between mb-2">
+          <div
+            {...listeners}
+            {...attributes}
+            className="text-gray-300 dark:text-gray-600 cursor-grab active:cursor-grabbing px-0.5 text-base leading-none"
+            title="Arrastrar para mover"
+          >
+            ⠿⠿
+          </div>
+          <div className="flex gap-1">
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onEdit(task)}
+              className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors"
+            >
+              Editar
+            </button>
+            {isAdmin && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => onDelete(task)}
+                className="text-xs px-2 py-0.5 rounded bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors"
+              >
+                Eliminar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <CardContent task={task} />
+
+      {isPrivileged && (
+        <div className="mt-2 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+          <span>{task.asignado ? `👤 ${task.asignado.nombre_completo}` : ''}</span>
+          {task.estado === 'Hecho' && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onReopen(task)}
+              className="text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              ↩ Reabrir
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function KanbanColumn({ column, tasks }) {
+function KanbanColumn({ column, tasks, isAdmin, isGestor, onEdit, onDelete, onReopen }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -117,7 +163,15 @@ function KanbanColumn({ column, tasks }) {
           ${column.borderStyle} ${isOver ? column.overStyle : 'bg-gray-50/60 dark:bg-gray-900/30'}`}
       >
         {tasks.map((task) => (
-          <DraggableCard key={task.id} task={task} />
+          <DraggableCard
+            key={task.id}
+            task={task}
+            isAdmin={isAdmin}
+            isGestor={isGestor}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onReopen={onReopen}
+          />
         ))}
         {tasks.length === 0 && (
           <div className="flex items-center justify-center h-28 text-xs text-gray-400 dark:text-gray-600">
@@ -183,18 +237,23 @@ function PhotoModal({ task, onSuccess, onCancel }) {
   )
 }
 
-export default function KanbanBoard({ userProfile }) {
+export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTask, setActiveTask] = useState(null)
   const [photoTask, setPhotoTask] = useState(null)
   const [dragError, setDragError] = useState('')
 
+  const isAdmin = userProfile?.rol === 'Administrador'
+  const isGestor = userProfile?.rol === 'Gestor'
+  const isPrivileged = isAdmin || isGestor
+
   const fetchTasks = useCallback(async () => {
     const { data, error } = await supabase
       .from('tareas')
       .select(`
         *,
+        asignado:usuarios!asignado_id(id, nombre_completo),
         categoria:categorias(nombre),
         area:areas_trabajo(nombre)
       `)
@@ -248,6 +307,19 @@ export default function KanbanBoard({ userProfile }) {
     await fetchTasks()
   }
 
+  async function handleDelete(task) {
+    if (!window.confirm(`¿Eliminar la tarea "${task.nombre}"?`)) return
+    const { error } = await supabase.from('tareas').delete().eq('id', task.id)
+    if (error) setDragError(error.message)
+    else fetchTasks()
+  }
+
+  async function handleReopen(task) {
+    const { error } = await supabase.from('tareas').update({ estado: 'En curso' }).eq('id', task.id)
+    if (error) setDragError(error.message)
+    else fetchTasks()
+  }
+
   const tasksByEstado = COLUMNS.reduce((acc, col) => {
     acc[col.id] = tasks.filter((t) => t.estado === col.id)
     return acc
@@ -260,8 +332,22 @@ export default function KanbanBoard({ userProfile }) {
   if (tasks.length === 0) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6">Mis Tareas</h2>
-        <div className="text-center py-16 text-gray-400 dark:text-gray-500">No tienes tareas asignadas aún.</div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+            {isPrivileged ? 'Todas las Tareas' : 'Mis Tareas'}
+          </h2>
+          {isPrivileged && onNew && (
+            <button
+              onClick={onNew}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + Nueva tarea
+            </button>
+          )}
+        </div>
+        <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+          {isPrivileged ? 'No hay tareas aún.' : 'No tienes tareas asignadas aún.'}
+        </div>
       </div>
     )
   }
@@ -269,10 +355,22 @@ export default function KanbanBoard({ userProfile }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Mis Tareas</h2>
-        <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
-          Arrastra las tarjetas para cambiar el estado
-        </span>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+          {isPrivileged ? 'Todas las Tareas' : 'Mis Tareas'}
+        </h2>
+        <div className="flex items-center gap-3">
+          {isPrivileged && onNew && (
+            <button
+              onClick={onNew}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + Nueva tarea
+            </button>
+          )}
+          <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
+            Arrastra las tarjetas para cambiar el estado
+          </span>
+        </div>
       </div>
 
       {dragError && (
@@ -289,7 +387,16 @@ export default function KanbanBoard({ userProfile }) {
             onDragEnd={handleDragEnd}
           >
             {COLUMNS.map((col) => (
-              <KanbanColumn key={col.id} column={col} tasks={tasksByEstado[col.id]} />
+              <KanbanColumn
+                key={col.id}
+                column={col}
+                tasks={tasksByEstado[col.id]}
+                isAdmin={isAdmin}
+                isGestor={isGestor}
+                onEdit={onEdit}
+                onDelete={handleDelete}
+                onReopen={handleReopen}
+              />
             ))}
 
             <DragOverlay dropAnimation={null}>

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import Navbar from './components/Navbar'
-import TaskList from './components/TaskList'
 import KanbanBoard from './components/KanbanBoard'
 import TaskForm from './components/TaskForm'
 import UserManagement from './components/UserManagement'
@@ -115,15 +114,11 @@ export default function App() {
       />
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6">
         {currentView === 'tasks' && (
-          isAdmin || isGestor ? (
-            <TaskList
-              userProfile={userProfile}
-              onEdit={handleEdit}
-              onNew={handleNew}
-            />
-          ) : (
-            <KanbanBoard userProfile={userProfile} />
-          )
+          <KanbanBoard
+            userProfile={userProfile}
+            onEdit={isAdmin || isGestor ? handleEdit : undefined}
+            onNew={isAdmin || isGestor ? handleNew : undefined}
+          />
         )}
         {currentView === 'form' && (
           <TaskForm
