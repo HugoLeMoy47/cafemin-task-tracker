@@ -213,7 +213,7 @@ function PhotoModal({ task, onSuccess, onCancel }) {
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-sm">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">📷 Foto de evidencia requerida</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Para mover <span className="font-medium text-gray-700 dark:text-gray-200">"{task.nombre}"</span> a Hecho necesitas subir una foto.
+          Para mover <span className="font-medium text-gray-700 dark:text-gray-200">&ldquo;{task.nombre}&rdquo;</span> a Hecho necesitas subir una foto.
         </p>
         {error && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{error}</p>}
         <input type="file" accept="image/jpeg,image/png,image/webp" ref={fileRef} onChange={handleFile} className="hidden" />
