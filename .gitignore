@@ -1,5 +1,29 @@
+# Dependencias / Dependencies
 node_modules
+
+# Artefactos de build / Build artifacts
 dist
+dist-ssr
+
+# Variables de entorno — NUNCA versionar / Environment variables — NEVER commit
 .env
 .env.local
+.env.*.local
 *.local
+
+# Herramientas de análisis / Analysis tooling output
+graphify-out/
+
+# Configuración local de editores y agentes / Local editor & agent config
+.claude/
+.vscode/
+.idea/
+*.swp
+
+# Cobertura y caches de pruebas / Test coverage & caches
+coverage/
+.vitest/
+
+# Sistema operativo / OS files
+.DS_Store
+Thumbs.db
