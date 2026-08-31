@@ -145,17 +145,28 @@ npm run format:check  # Verifica formato sin escribir
 
 ---
 
-### 🌐 Despliegue (Cloudflare Pages)
+### 🌐 Despliegue (Cloudflare Workers · static assets)
 
-La demostración pública vive en `https://cafemintt.freejolitos.consulting` como proyecto independiente de Cloudflare Pages con dominio personalizado. Al servirse desde la raíz del subdominio **no se requiere `base` en `vite.config.js`**.
+La demostración pública vive en `https://cafemintt.freejolitos.consulting` como proyecto independiente de Cloudflare Workers con dominio personalizado. No hay código de Worker: solo se sirven los archivos estáticos que Vite construye en `dist/`. Al servirse desde la raíz del subdominio **no se requiere `base` en `vite.config.js`**.
 
-**Configuración del proyecto en Cloudflare Pages**
+**`wrangler.jsonc` es obligatorio.** Sin él, `wrangler deploy` intenta autodetectar el framework y falla con:
+
+```
+✘ [ERROR] The version of Vite used in the project ("5.4.21") cannot be
+  automatically configured. Please update the Vite version to at least "6.0.0"
+```
+
+Ese camino automático usa el plugin de Cloudflare para Vite, que exige Vite ≥ 6. La presencia de `wrangler.jsonc` desactiva la autodetección y deja el despliegue como una simple subida de archivos, compatible con Vite 5.
+
+**Configuración del proyecto en Cloudflare**
 
 | Ajuste | Valor |
 |--------|-------|
 | Build command | `npm run build` |
-| Output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 | Node version | 20 o superior |
+
+El directorio de salida lo define `assets.directory` en `wrangler.jsonc`, no la interfaz de Cloudflare.
 
 **Variables de entorno del build**
 
@@ -314,15 +325,19 @@ npm run format:check  # Check formatting without writing
 
 ---
 
-### 🌐 Deployment (Cloudflare Pages)
+### 🌐 Deployment (Cloudflare Workers · static assets)
 
-The public demo lives at `https://cafemintt.freejolitos.consulting` as a standalone Cloudflare Pages project with a custom domain. Because it is served from the subdomain root, **no `base` is needed in `vite.config.js`**.
+The public demo lives at `https://cafemintt.freejolitos.consulting` as a standalone Cloudflare Workers project with a custom domain. There is no Worker code — it only serves the static files Vite builds into `dist/`. Because it is served from the subdomain root, **no `base` is needed in `vite.config.js`**.
+
+**`wrangler.jsonc` is required.** Without it, `wrangler deploy` attempts framework auto-detection, which uses the Cloudflare Vite plugin and fails on Vite 5 (`Please update the Vite version to at least "6.0.0"`). The config file disables auto-detection and reduces the deploy to a plain asset upload.
 
 | Setting | Value |
 |---------|-------|
 | Build command | `npm run build` |
-| Output directory | `dist` |
+| Deploy command | `npx wrangler deploy` |
 | Node version | 20 or higher |
+
+The output directory is set by `assets.directory` in `wrangler.jsonc`, not in the Cloudflare UI.
 
 Build environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_DEMO_MODE=true`. The demo flag shows the demo-environment notice and hides the sign-up form; it is resolved **at build time**, so changing it requires a new deployment.
 

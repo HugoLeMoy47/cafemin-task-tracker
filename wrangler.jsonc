@@ -1,0 +1,21 @@
+{
+  // Despliegue del sitio estático en Cloudflare Workers (static assets).
+  // Static site deployment on Cloudflare Workers (static assets).
+  //
+  // La sola presencia de este archivo desactiva la autodetección de framework
+  // de wrangler, que exige Vite >= 6. No hay código de Worker: solo se sirven
+  // los archivos construidos por Vite en dist/.
+  //
+  // The mere presence of this file disables wrangler's framework
+  // auto-detection, which requires Vite >= 6. There is no Worker code here:
+  // it only serves the static files Vite builds into dist/.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cafemin-task-tracker",
+  "compatibility_date": "2026-08-31",
+  "assets": {
+    "directory": "./dist/",
+    // Devuelve index.html en rutas desconocidas para que un F5 no dé 404.
+    // Serves index.html on unknown routes so a refresh never 404s.
+    "not_found_handling": "single-page-application"
+  }
+}
