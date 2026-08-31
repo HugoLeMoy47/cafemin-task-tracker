@@ -47,6 +47,24 @@ export default [
       // surfaces real defects; migrating to TS is a pending decision.
       'react/prop-types': 'off',
 
+      // Las credenciales de Supabase se leen en UN solo archivo
+      // (src/supabaseClient.js). Importar el SDK en otro lado invita a
+      // duplicar la lectura del entorno, que es como se rompio un despliegue.
+      // Supabase credentials are read in exactly ONE file. Importing the SDK
+      // elsewhere invites duplicated env reads — how a deployment once broke.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@supabase/supabase-js',
+              message:
+                'Importa el cliente desde src/supabaseClient.js (supabase o createTransientClient). / Import the client from src/supabaseClient.js instead.',
+            },
+          ],
+        },
+      ],
+
       // Higiene general / General hygiene
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -68,6 +86,13 @@ export default [
     languageOptions: {
       globals: { ...globals.node },
     },
+  },
+
+  // Unico archivo autorizado a importar el SDK de Supabase.
+  // The only file allowed to import the Supabase SDK.
+  {
+    files: ['src/supabaseClient.js'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 
   // Prettier al final: desactiva reglas de formato en conflicto.

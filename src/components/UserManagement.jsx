@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../supabaseClient'
+import { supabase, createTransientClient } from '../supabaseClient'
 import { validateEmail, validatePassword } from '../utils/validation'
 
 const ROLES = ['Administrador', 'Gestor', 'Asignado']
@@ -11,11 +10,7 @@ const ROL_STYLE = {
   Asignado: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
 }
 
-const transientClient = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  { auth: { persistSession: false, autoRefreshToken: false } }
-)
+const transientClient = createTransientClient()
 
 const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
 const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'

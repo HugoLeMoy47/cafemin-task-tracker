@@ -74,3 +74,27 @@ if (missing.length > 0) {
 }
 
 export const supabase = createClient(supabaseUrl, supabasePublicKey)
+
+/**
+ * Cliente efímero que NO persiste la sesión.
+ * Ephemeral client that does NOT persist the session.
+ *
+ * Lo usa el alta de usuarios: `signUp` reemplazaría la sesión del
+ * Administrador por la del usuario recién creado. Con `persistSession: false`
+ * el Admin conserva su sesión.
+ *
+ * Existe como fábrica, y no como un `createClient` suelto en el componente,
+ * para que las credenciales se lean en UN solo archivo. Tenerlas duplicadas
+ * fue precisamente lo que rompió el despliegue: al renombrar la variable de
+ * la clave, la copia olvidada quedó con `undefined` y reventó al cargar.
+ *
+ * It exists as a factory rather than a loose `createClient` inside the
+ * component so credentials are read in exactly ONE file. Duplicating them is
+ * what broke the deployment: renaming the key variable left a forgotten copy
+ * resolving to `undefined`, which threw during module evaluation.
+ */
+export function createTransientClient() {
+  return createClient(supabaseUrl, supabasePublicKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
