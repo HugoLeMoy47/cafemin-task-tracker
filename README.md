@@ -120,9 +120,16 @@ supabase/
 ### ⚙️ Comandos
 
 ```bash
-npm run dev      # Servidor de desarrollo en localhost:5173
-npm run build    # Build de producción en /dist
-npm run preview  # Vista previa del build de producción
+npm run dev           # Servidor de desarrollo en localhost:5173
+npm run build         # Build de producción en /dist
+npm run preview       # Vista previa del build de producción
+
+npm test              # Pruebas unitarias (Vitest)
+npm run test:watch    # Pruebas en modo observador
+npm run lint          # ESLint
+npm run lint:fix      # ESLint con correcciones automáticas
+npm run format        # Formatea con Prettier
+npm run format:check  # Verifica formato sin escribir
 ```
 
 ### 🔒 Seguridad
@@ -131,9 +138,44 @@ npm run preview  # Vista previa del build de producción
 - **WITH CHECK en políticas UPDATE**: la política de Asignado tiene cláusula `WITH CHECK` para impedir auto-reasignación de tareas.
 - **Trigger de columnas**: el trigger `trg_restrict_asignado_update` restringe al Asignado a solo modificar `estado` y `evidencia_url`, bloqueando cambios a cualquier otro campo a nivel DB.
 - **Guards de rol en cliente**: `App.jsx` y `KanbanBoard.jsx` verifican el rol antes de permitir acciones, como capa adicional de defensa.
-- **Bucket de Storage con RLS**: el bucket `evidencias` tiene políticas explícitas de INSERT, SELECT y DELETE.
+- **Bucket de Storage con políticas explícitas**: el bucket `evidencias` define políticas de INSERT, SELECT y DELETE.
+  > ⚠️ **Pendiente antes de exponer la app en internet.** La política de SELECT concede lectura al rol `public` y el bucket está marcado como público, porque el cliente usa `getPublicUrl()`. Las fotos de evidencia son legibles por cualquiera que conozca su URL, sin sesión. Para un despliegue público hay que pasar el bucket a privado, guardar la ruta en lugar de la URL y migrar a `createSignedUrl()`.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
+
+---
+
+### 🌐 Despliegue (Cloudflare Pages)
+
+La demostración pública vive en `https://cafemintt.freejolitos.consulting` como proyecto independiente de Cloudflare Pages con dominio personalizado. Al servirse desde la raíz del subdominio **no se requiere `base` en `vite.config.js`**.
+
+**Configuración del proyecto en Cloudflare Pages**
+
+| Ajuste | Valor |
+|--------|-------|
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Node version | 20 o superior |
+
+**Variables de entorno del build**
+
+| Variable | Valor en la demo |
+|----------|------------------|
+| `VITE_SUPABASE_URL` | URL del proyecto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Anon key del proyecto |
+| `VITE_DEMO_MODE` | `true` |
+
+`VITE_DEMO_MODE=true` muestra el aviso de ambiente de demostración y oculta el formulario de registro. Se resuelve **al construir**: cambiarla exige un nuevo despliegue.
+
+**En Supabase, antes de publicar**
+
+1. Authentication → Providers → apagar *Allow new users to sign up*.
+2. Authentication → URL Configuration → *Site URL* y *Redirect URLs* apuntando a `https://cafemintt.freejolitos.consulting`.
+3. Crear las cuentas de demostración, una por rol, y sembrar datos ficticios.
+
+`public/_headers` aplica `X-Robots-Tag: noindex`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y cacheo permanente para los assets con hash en el nombre.
+
+> El plan gratuito de Supabase pausa proyectos con baja actividad durante 7 días. Si la demo estará dormida entre presentaciones, verifica que el proyecto siga arriba antes de compartir la URL.
 
 ---
 
@@ -247,9 +289,16 @@ supabase/
 ### ⚙️ Commands
 
 ```bash
-npm run dev      # Development server at localhost:5173
-npm run build    # Production build in /dist
-npm run preview  # Preview the production build
+npm run dev           # Development server at localhost:5173
+npm run build         # Production build in /dist
+npm run preview       # Preview the production build
+
+npm test              # Unit tests (Vitest)
+npm run test:watch    # Tests in watch mode
+npm run lint          # ESLint
+npm run lint:fix      # ESLint with autofix
+npm run format        # Format with Prettier
+npm run format:check  # Check formatting without writing
 ```
 
 ### 🔒 Security
@@ -258,6 +307,26 @@ npm run preview  # Preview the production build
 - **WITH CHECK on UPDATE policies**: the Asignado policy includes a `WITH CHECK` clause to prevent self-reassignment of tasks.
 - **Column-lock trigger**: `trg_restrict_asignado_update` ensures Asignado can only modify `estado` and `evidencia_url` at the DB level, blocking all other field changes.
 - **Client-side role guards**: `App.jsx` and `KanbanBoard.jsx` verify the role before allowing actions, as an additional defense-in-depth layer.
-- **Storage bucket with RLS**: the `evidencias` bucket has explicit INSERT, SELECT and DELETE policies.
+- **Storage bucket with explicit policies**: the `evidencias` bucket defines INSERT, SELECT and DELETE policies.
+  > ⚠️ **Outstanding before exposing the app on the internet.** The SELECT policy grants read access to the `public` role and the bucket is marked public, because the client uses `getPublicUrl()`. Evidence photos are readable by anyone who knows the URL, with no session. A public deployment requires making the bucket private, storing the path instead of the URL, and migrating to `createSignedUrl()`.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
+
+---
+
+### 🌐 Deployment (Cloudflare Pages)
+
+The public demo lives at `https://cafemintt.freejolitos.consulting` as a standalone Cloudflare Pages project with a custom domain. Because it is served from the subdomain root, **no `base` is needed in `vite.config.js`**.
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Node version | 20 or higher |
+
+Build environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_DEMO_MODE=true`. The demo flag shows the demo-environment notice and hides the sign-up form; it is resolved **at build time**, so changing it requires a new deployment.
+
+Before publishing, in Supabase: turn off *Allow new users to sign up*, set *Site URL* and *Redirect URLs* to the deployment URL, and create the demo accounts.
+
+> Supabase pauses free-plan projects after 7 days of low activity. Check the project is awake before sharing the URL.
+

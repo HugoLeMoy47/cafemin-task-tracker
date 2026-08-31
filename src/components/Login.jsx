@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { DEMO_MODE } from '../config'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -104,6 +105,12 @@ export default function Login() {
           </button>
         </form>
 
+        {DEMO_MODE ? (
+          <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+            El alta de usuarios la realiza el administrador. Si necesitas una cuenta de prueba,
+            solicítala a quien te compartió esta demostración.
+          </p>
+        ) : (
         <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
           {mode === 'login' ? (
             <>
@@ -127,6 +134,7 @@ export default function Login() {
             </>
           )}
         </p>
+        )}
       </div>
       </div>
       <footer className="border-t border-gray-200/60 dark:border-gray-700/60 bg-white/40 dark:bg-gray-900/40 py-3">
