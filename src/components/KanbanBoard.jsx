@@ -9,6 +9,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../supabaseClient'
 import { validateImageFile } from '../utils/validation'
+import { buildEvidencePath } from '../lib/evidencias'
+import EvidenceLink from './EvidenceLink'
 
 const COLUMNS = [
   {
@@ -61,15 +63,11 @@ function CardContent({ task }) {
           <span className="text-orange-500 dark:text-orange-400">📷 foto requerida</span>
         )}
         {task.evidencia_url && (
-          <a
-            href={task.evidencia_url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-500 dark:text-blue-400 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            📷 ver foto
-          </a>
+          <EvidenceLink
+            value={task.evidencia_url}
+            label="📷 ver foto"
+            className="text-blue-500 dark:text-blue-400 hover:underline disabled:opacity-60"
+          />
         )}
       </div>
     </>
@@ -195,14 +193,14 @@ function PhotoModal({ task, onSuccess, onCancel }) {
     if (fileError) { setError(fileError); return }
     setUploading(true)
     setError('')
-    const ext = file.name.split('.').pop()
-    const path = `${task.id}/${Date.now()}.${ext}`
+    const path = buildEvidencePath(task.id, file.name)
     const { error: uploadErr } = await supabase.storage.from('evidencias').upload(path, file)
     if (uploadErr) { setError('Error al subir foto: ' + uploadErr.message); setUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('evidencias').getPublicUrl(path)
+    // Se guarda la RUTA: el bucket es privado y las URLs firmadas caducan.
+    // Store the PATH: the bucket is private and signed URLs expire.
     const { error: updateErr } = await supabase
       .from('tareas')
-      .update({ estado: 'Hecho', evidencia_url: publicUrl })
+      .update({ estado: 'Hecho', evidencia_url: path })
       .eq('id', task.id)
     if (updateErr) { setError(updateErr.message); setUploading(false); return }
     onSuccess()

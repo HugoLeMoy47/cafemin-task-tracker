@@ -95,6 +95,15 @@ export const supabase = createClient(supabaseUrl, supabasePublicKey)
  */
 export function createTransientClient() {
   return createClient(supabaseUrl, supabasePublicKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      // storageKey propio: sin esto, supabase-js advierte "Multiple
+      // GoTrueClient instances detected in the same browser context" porque
+      // ambos clientes competirían por la misma llave de almacenamiento.
+      // Its own storageKey: without it, supabase-js warns about multiple
+      // GoTrueClient instances sharing one storage key.
+      storageKey: 'cafemin-transient-auth',
+    },
   })
 }

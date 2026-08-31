@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { validateImageFile } from '../utils/validation'
+import { buildEvidencePath } from '../lib/evidencias'
+import EvidenceLink from './EvidenceLink'
 
 const ESTADO_STYLE = {
   Pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700',
@@ -50,18 +52,18 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
     if (fileError) { setError(fileError); return }
     setUploading(true)
     setError('')
-    const ext = file.name.split('.').pop()
-    const path = `${task.id}/${Date.now()}.${ext}`
+    const path = buildEvidencePath(task.id, file.name)
     const { error: uploadErr } = await supabase.storage.from('evidencias').upload(path, file)
     if (uploadErr) {
       setError('Error al subir foto: ' + uploadErr.message)
       setUploading(false)
       return
     }
-    const { data: { publicUrl } } = supabase.storage.from('evidencias').getPublicUrl(path)
+    // Se guarda la RUTA: el bucket es privado y las URLs firmadas caducan.
+    // Store the PATH: the bucket is private and signed URLs expire.
     const { error: updateErr } = await supabase
       .from('tareas')
-      .update({ estado: 'Hecho', evidencia_url: publicUrl })
+      .update({ estado: 'Hecho', evidencia_url: path })
       .eq('id', task.id)
     if (updateErr) setError(updateErr.message)
     else { setAwaitingPhoto(false); onRefresh() }
@@ -135,10 +137,10 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
       {/* Evidencia foto */}
       {task.evidencia_url && (
         <div className="mt-3">
-          <a href={task.evidencia_url} target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline">
-            📷 Ver evidencia
-          </a>
+          <EvidenceLink
+            value={task.evidencia_url}
+            className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-60"
+          />
         </div>
       )}
 

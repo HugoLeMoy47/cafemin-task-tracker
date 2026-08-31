@@ -10,7 +10,17 @@ const ROL_STYLE = {
   Asignado: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
 }
 
-const transientClient = createTransientClient()
+/**
+ * Se crea de forma perezosa, no al cargar el módulo: así el cliente efímero
+ * solo existe si alguien abre realmente la gestión de usuarios.
+ * Created lazily so the ephemeral client only exists if user management is
+ * actually opened.
+ */
+let transientClientCache = null
+function getTransientClient() {
+  if (!transientClientCache) transientClientCache = createTransientClient()
+  return transientClientCache
+}
 
 const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
 const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
@@ -55,7 +65,7 @@ export default function UserManagement() {
       return
     }
 
-    const { data, error: signUpError } = await transientClient.auth.signUp({
+    const { data, error: signUpError } = await getTransientClient().auth.signUp({
       email: form.correo.trim(),
       password: form.password,
       options: { data: { nombre_completo: form.nombreCompleto.trim() } },
