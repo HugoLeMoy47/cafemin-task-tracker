@@ -3,6 +3,7 @@ import {
   normalizeText,
   validateEmail,
   validatePassword,
+  validatePasswordChange,
   validateTaskPayload,
   validateImageFile,
 } from './validation.js'
@@ -140,5 +141,36 @@ describe('validateImageFile', () => {
 
   it('acepta un archivo de 0 bytes con tipo válido / accepts a 0-byte file with a valid type', () => {
     expect(validateImageFile(archivo('image/png', 0))).toBeNull()
+  })
+})
+
+describe('validatePasswordChange', () => {
+  it('acepta dos contraseñas iguales y suficientemente largas / accepts a valid pair', () => {
+    expect(validatePasswordChange({ password: 'abc123', confirmacion: 'abc123' })).toBeNull()
+  })
+
+  it('rechaza contraseñas cortas antes de comparar / rejects short passwords first', () => {
+    expect(validatePasswordChange({ password: '123', confirmacion: '123' })).toMatch(
+      /al menos 6 caracteres/
+    )
+  })
+
+  it('rechaza cuando no coinciden / rejects a mismatch', () => {
+    expect(validatePasswordChange({ password: 'abc123', confirmacion: 'abc124' })).toMatch(
+      /no coinciden/
+    )
+  })
+
+  it('distingue mayúsculas al comparar / comparison is case sensitive', () => {
+    expect(validatePasswordChange({ password: 'Secreto1', confirmacion: 'secreto1' })).toMatch(
+      /no coinciden/
+    )
+  })
+
+  it('rechaza entradas ausentes o de tipo inesperado / rejects missing or odd input', () => {
+    expect(validatePasswordChange({ password: '', confirmacion: '' })).toMatch(/al menos 6/)
+    expect(validatePasswordChange({ password: null, confirmacion: null })).toMatch(/al menos 6/)
+    expect(validatePasswordChange({})).toMatch(/al menos 6/)
+    expect(validatePasswordChange({ password: 123456, confirmacion: 123456 })).toMatch(/al menos 6/)
   })
 })

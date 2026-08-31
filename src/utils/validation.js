@@ -23,6 +23,23 @@ export const validateTaskPayload = ({ nombre, detalles }) => {
   return null
 }
 
+/**
+ * Valida el cambio de contraseña: longitud y coincidencia.
+ * Validates a password change: length and confirmation match.
+ *
+ * Devuelve el mensaje de error, o null si es válida.
+ * Returns the error message, or null when valid.
+ */
+export const validatePasswordChange = ({ password, confirmacion }) => {
+  if (!validatePassword(password)) {
+    return 'La contraseña debe tener al menos 6 caracteres. / Password must be at least 6 characters.'
+  }
+  if (password !== confirmacion) {
+    return 'Las contraseñas no coinciden. / Passwords do not match.'
+  }
+  return null
+}
+
 export const validateImageFile = (file) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
   const maxBytes = 5 * 1024 * 1024

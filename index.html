@@ -8,6 +8,14 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>CAFEMIN – Seguidor de Tareas</title>
     <script>
+      // Marca si la página se abrió desde un enlace de recuperación de
+      // contraseña. Debe leerse AQUÍ, antes de que cargue el bundle: el cliente
+      // de Supabase consume y limpia el fragmento de la URL al inicializarse.
+      // Flag whether the page was opened from a password-recovery link. It must
+      // be read HERE, before the bundle loads: the Supabase client consumes and
+      // clears the URL fragment on initialization.
+      window.__cafeminRecuperacion = /(^|[#&])type=recovery(&|$)/.test(location.hash)
+
       // Aplica dark mode antes del primer render para evitar flash blanco
       if (localStorage.getItem('darkMode') === 'true' ||
          (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {

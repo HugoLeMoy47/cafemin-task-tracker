@@ -188,6 +188,21 @@ La clave pública admite dos nombres: `VITE_SUPABASE_PUBLISHABLE_KEY` (clave nue
 2. Authentication → URL Configuration → *Site URL* y *Redirect URLs* apuntando a `https://cafemintt.freejolitos.consulting`.
 3. Crear las cuentas de demostración, una por rol, y sembrar datos ficticios.
 
+### 🔑 Restablecimiento de contraseña
+
+Con el registro público apagado, el alta la hace el Administrador — pero quien olvida su contraseña necesita recuperarla por su cuenta. El flujo está implementado:
+
+1. En el login, *¿Olvidaste tu contraseña?* pide el correo y llama a `resetPasswordForEmail` con `redirectTo` al origen del sitio.
+2. Supabase envía un enlace. Al seguirlo, la persona llega con una sesión temporal.
+3. `index.html` marca la llegada (`window.__cafeminRecuperacion`) **antes** de que cargue el bundle, porque el cliente de Supabase consume y limpia el fragmento de la URL al inicializarse. `App.jsx` intercepta y muestra `UpdatePassword.jsx` en vez de la aplicación: sin esa guarda, quien sigue el enlace entraría sin haber cambiado nada.
+4. Al guardar, se cierra la sesión para forzar un inicio con la contraseña nueva.
+
+El mensaje de confirmación es el mismo exista o no la cuenta, para no convertir la pantalla en un detector de correos registrados.
+
+> ⚠️ **Requiere SMTP propio.** El servicio de correo por defecto de Supabase solo entrega a direcciones del equipo del proyecto y permite ~2 mensajes por hora; el resto recibe *Email address not authorized*. La documentación de Supabase indica que no es para producción. **Sin SMTP configurado en Authentication → Emails → SMTP Settings, esta pantalla existe pero los correos no llegan al personal.**
+
+> El `redirectTo` usa `window.location.origin`, así que la URL del despliegue debe estar en *Redirect URLs*.
+
 `public/_headers` aplica `X-Robots-Tag: noindex`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y cacheo permanente para los assets con hash en el nombre.
 
 > El plan gratuito de Supabase pausa proyectos con baja actividad durante 7 días. Si la demo estará dormida entre presentaciones, verifica que el proyecto siga arriba antes de compartir la URL.
@@ -346,6 +361,12 @@ The output directory is set by `assets.directory` in `wrangler.jsonc`, not in th
 Build environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (or the legacy `VITE_SUPABASE_ANON_KEY`) and `VITE_DEMO_MODE=true`. **Never** use `service_role`, `sb_secret_…` or a Postgres connection string — these variables are baked into the public bundle and those credentials bypass RLS entirely. The demo flag shows the demo-environment notice and hides the sign-up form; it is resolved **at build time**, so changing it requires a new deployment.
 
 Before publishing, in Supabase: turn off *Allow new users to sign up*, set *Site URL* and *Redirect URLs* to the deployment URL, and create the demo accounts.
+
+### 🔑 Password reset
+
+Public sign-up is off, so accounts are created by an Administrator — but users still need to recover forgotten passwords. The flow is implemented: *Forgot your password?* on the login screen calls `resetPasswordForEmail`; `index.html` flags the recovery arrival before the bundle loads (the Supabase client consumes and clears the URL fragment on init), and `App.jsx` intercepts to render `UpdatePassword.jsx` instead of the app. The confirmation message is identical whether or not the account exists, to avoid user enumeration.
+
+> ⚠️ **Requires custom SMTP.** Supabase's built-in email service only delivers to project team addresses and allows about 2 messages per hour; everyone else gets *Email address not authorized*. Without SMTP configured under Authentication → Emails, the screen exists but no mail reaches staff.
 
 > Supabase pauses free-plan projects after 7 days of low activity. Check the project is awake before sharing the URL.
 

@@ -20,6 +20,38 @@ export default function Login() {
     setLoading(false)
   }
 
+  /**
+   * Envía el correo de recuperación.
+   *
+   * El mensaje de confirmación es DELIBERADAMENTE el mismo exista o no la
+   * cuenta: responder distinto convertiría esta pantalla en un detector de
+   * correos registrados (enumeración de usuarios).
+   *
+   * The confirmation message is deliberately identical whether or not the
+   * account exists: differing responses would turn this screen into a user
+   * enumeration oracle.
+   */
+  async function handleReset(e) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+
+    // Solo se muestran fallos de transporte (red, límite de envío), nunca si la
+    // cuenta existe. Show transport failures only, never account existence.
+    if (error) setError(error.message)
+    else {
+      setMessage(
+        'Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña. Revisa también la carpeta de correo no deseado.'
+      )
+    }
+    setLoading(false)
+  }
+
   async function handleSignup(e) {
     e.preventDefault()
     setLoading(true)
@@ -59,7 +91,12 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
+        <form
+          onSubmit={
+            mode === 'login' ? handleLogin : mode === 'reset' ? handleReset : handleSignup
+          }
+          className="space-y-4"
+        >
           {mode === 'signup' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre completo</label>
@@ -84,6 +121,7 @@ export default function Login() {
               placeholder="correo@ejemplo.com"
             />
           </div>
+          {mode !== 'reset' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña</label>
             <input
@@ -96,14 +134,39 @@ export default function Login() {
               placeholder="Mínimo 6 caracteres"
             />
           </div>
+          )}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
-            {loading ? 'Cargando...' : mode === 'login' ? 'Iniciar sesión' : 'Registrarse'}
+            {loading
+              ? 'Cargando...'
+              : mode === 'login'
+                ? 'Iniciar sesión'
+                : mode === 'reset'
+                  ? 'Enviar enlace'
+                  : 'Registrarse'}
           </button>
         </form>
+
+        <p className="mt-4 text-center text-sm">
+          {mode === 'reset' ? (
+            <button
+              onClick={() => { setMode('login'); setError(''); setMessage('') }}
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Volver a iniciar sesión
+            </button>
+          ) : (
+            <button
+              onClick={() => { setMode('reset'); setError(''); setMessage('') }}
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
+        </p>
 
         {DEMO_MODE ? (
           <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">

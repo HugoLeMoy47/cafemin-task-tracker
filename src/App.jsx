@@ -7,6 +7,7 @@ import TaskForm from './components/TaskForm'
 import UserManagement from './components/UserManagement'
 import CatalogManagement from './components/CatalogManagement'
 import Reports from './components/Reports'
+import UpdatePassword from './components/UpdatePassword'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -15,6 +16,21 @@ export default function App() {
   const [currentView, setCurrentView] = useState('tasks')
   const [editingTask, setEditingTask] = useState(null)
   const [loading, setLoading] = useState(true)
+  /**
+   * ¿La visita llegó por un enlace de recuperación?
+   *
+   * La marca la deja index.html antes de que cargue el bundle, porque el
+   * cliente de Supabase consume y limpia el fragmento de la URL al
+   * inicializarse. Se complementa con el evento PASSWORD_RECOVERY por si el
+   * orden de carga cambiara.
+   *
+   * Set by index.html before the bundle loads, since the Supabase client
+   * consumes and clears the URL fragment on init. The PASSWORD_RECOVERY event
+   * is kept as a second signal in case load order ever changes.
+   */
+  const [recuperando, setRecuperando] = useState(
+    () => typeof window !== 'undefined' && window.__cafeminRecuperacion === true
+  )
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem('darkMode')
     return stored !== null
@@ -32,7 +48,8 @@ export default function App() {
 
   useEffect(() => {
     // onAuthStateChange emits INITIAL_SESSION synchronously, so getSession is redundant
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setRecuperando(true)
       setSession(session)
       if (session) fetchProfile(session.user.id)
       else { setUserProfile(null); setProfileError(false); setLoading(false) }
@@ -75,6 +92,16 @@ export default function App() {
         <div className="text-gray-500 dark:text-gray-400">Cargando...</div>
       </div>
     )
+  }
+
+  // La recuperación se atiende antes que cualquier otra vista: quien llega por
+  // el enlace ya trae sesión temporal y, sin esta guarda, entraría a la
+  // aplicación sin haber cambiado la contraseña.
+  // Recovery is handled before any other view: the link already grants a
+  // temporary session, so without this guard the user would simply land in the
+  // app without having changed anything.
+  if (recuperando && session) {
+    return <UpdatePassword onListo={() => setRecuperando(false)} />
   }
 
   if (!session) return <Login />
