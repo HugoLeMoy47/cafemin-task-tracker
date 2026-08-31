@@ -17,11 +17,24 @@ import { createClient } from '@supabase/supabase-js'
  */
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+/**
+ * Clave pública del proyecto. Se acepta cualquiera de los dos nombres para no
+ * romper entornos ya configurados durante la migración de Supabase:
+ *   - VITE_SUPABASE_PUBLISHABLE_KEY → clave nueva (sb_publishable_...)
+ *   - VITE_SUPABASE_ANON_KEY        → clave heredada (JWT, eyJ...)
+ * Ambas tienen los mismos privilegios bajos y quedan sujetas a RLS.
+ *
+ * Public project key. Either variable name is accepted so already-configured
+ * environments keep working through Supabase's key migration. Both carry the
+ * same low privileges and remain subject to RLS.
+ */
+const supabasePublicKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const missing = [
   !supabaseUrl && 'VITE_SUPABASE_URL',
-  !supabaseAnonKey && 'VITE_SUPABASE_ANON_KEY',
+  !supabasePublicKey && 'VITE_SUPABASE_PUBLISHABLE_KEY (o VITE_SUPABASE_ANON_KEY)',
 ].filter(Boolean)
 
 if (missing.length > 0) {
@@ -60,4 +73,4 @@ if (missing.length > 0) {
   throw new Error(mensaje)
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabasePublicKey)

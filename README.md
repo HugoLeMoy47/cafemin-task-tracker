@@ -173,8 +173,12 @@ El directorio de salida lo define `assets.directory` en `wrangler.jsonc`, no la 
 | Variable | Valor en la demo |
 |----------|------------------|
 | `VITE_SUPABASE_URL` | URL del proyecto Supabase |
-| `VITE_SUPABASE_ANON_KEY` | Anon key del proyecto |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Clave pública (`sb_publishable_…`) |
 | `VITE_DEMO_MODE` | `true` |
+
+La clave pública admite dos nombres: `VITE_SUPABASE_PUBLISHABLE_KEY` (clave nueva) o `VITE_SUPABASE_ANON_KEY` (clave heredada, JWT `eyJ…`). Si están las dos, gana la primera. Ambas tienen privilegios bajos y quedan sujetas a RLS.
+
+> ⚠️ **Nunca** uses aquí `service_role`, `sb_secret_…` ni una cadena de conexión a Postgres. Vite hornea estas variables en el bundle público: quien abra las herramientas de desarrollo las leería, y esas credenciales saltan RLS por completo.
 
 `VITE_DEMO_MODE=true` muestra el aviso de ambiente de demostración y oculta el formulario de registro. Se resuelve **al construir**: cambiarla exige un nuevo despliegue.
 
@@ -339,7 +343,7 @@ The public demo lives at `https://cafemintt.freejolitos.consulting` as a standal
 
 The output directory is set by `assets.directory` in `wrangler.jsonc`, not in the Cloudflare UI.
 
-Build environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and `VITE_DEMO_MODE=true`. The demo flag shows the demo-environment notice and hides the sign-up form; it is resolved **at build time**, so changing it requires a new deployment.
+Build environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (or the legacy `VITE_SUPABASE_ANON_KEY`) and `VITE_DEMO_MODE=true`. **Never** use `service_role`, `sb_secret_…` or a Postgres connection string — these variables are baked into the public bundle and those credentials bypass RLS entirely. The demo flag shows the demo-environment notice and hides the sign-up form; it is resolved **at build time**, so changing it requires a new deployment.
 
 Before publishing, in Supabase: turn off *Allow new users to sign up*, set *Site URL* and *Redirect URLs* to the deployment URL, and create the demo accounts.
 
