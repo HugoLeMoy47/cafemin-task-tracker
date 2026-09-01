@@ -69,7 +69,13 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 2. supabase/migrations/add_fecha_limite.sql
 3. supabase/migrations/storage_evidencias_policies.sql
 4. supabase/migrations/security_rls_and_stability.sql
+5. supabase/migrations/add_fecha_inicio.sql
+6. supabase/migrations/hardening_rls_demo_publica.sql
+7. supabase/migrations/storage_evidencias_privado.sql
 ```
+
+> `add_fecha_inicio.sql` reemplaza el trigger `trg_fecha_hecho` por `trg_marcas_de_tiempo`, que además sella cuándo una tarea entra a *En curso*. Sin esa marca solo se puede medir el tiempo total, que mezcla el tiempo que la tarea pasó esperando con el que costó hacerla.
+
 
 Después de ejecutar el schema, regístrate en la app con tu correo de administrador y luego ejecuta este SQL para asignarte el rol:
 
@@ -296,7 +302,13 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 2. supabase/migrations/add_fecha_limite.sql
 3. supabase/migrations/storage_evidencias_policies.sql
 4. supabase/migrations/security_rls_and_stability.sql
+5. supabase/migrations/add_fecha_inicio.sql
+6. supabase/migrations/hardening_rls_demo_publica.sql
+7. supabase/migrations/storage_evidencias_privado.sql
 ```
+
+> `add_fecha_inicio.sql` replaces the `trg_fecha_hecho` trigger with `trg_marcas_de_tiempo`, which also stamps when a task enters *En curso*. Without that stamp only total time is measurable, which conflates waiting with working.
+
 
 After running the schema, sign up in the app with your admin email, then run this SQL to grant yourself the Admin role:
 
