@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import CollapsibleGroup from './reports/CollapsibleGroup'
+import { construirCsv, descargarCsv, fechaCsv, nombreArchivoCsv } from '../lib/csv'
 
 const TABS = ['Por Estado', 'Por Asignado', 'Por Fecha']
 
@@ -14,6 +16,42 @@ const ESTADO_STYLE = {
   Hecho: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
 }
 
+/**
+ * El CSV exporta SIEMPRE todas las columnas, aunque la pestaña muestre menos.
+ * Quien descarga un reporte lo va a filtrar en su hoja de cálculo; entregarle
+ * un recorte lo obliga a volver a exportar. La pestaña define el orden, el
+ * agrupamiento y el nombre del archivo, no qué datos se llevan.
+ *
+ * The CSV always carries every column even when the tab shows fewer: whoever
+ * downloads it will filter in a spreadsheet, and a trimmed export just forces
+ * a second trip. The tab decides ordering, grouping and filename — not scope.
+ */
+const COLUMNAS_CSV = [
+  { clave: 'grupo', titulo: 'Grupo' },
+  { clave: 'tarea', titulo: 'Tarea' },
+  { clave: 'estado', titulo: 'Estado' },
+  { clave: 'asignado', titulo: 'Asignado' },
+  { clave: 'categoria', titulo: 'Categoría' },
+  { clave: 'area', titulo: 'Área' },
+  { clave: 'creada', titulo: 'Creada' },
+  { clave: 'limite', titulo: 'Límite' },
+  { clave: 'hecha', titulo: 'Hecha' },
+]
+
+function filaCsv(t, grupo) {
+  return {
+    grupo,
+    tarea: t.nombre,
+    estado: t.estado,
+    asignado: t.asignado?.nombre_completo || 'Sin asignar',
+    categoria: t.categoria?.nombre || '',
+    area: t.area?.nombre || '',
+    creada: fechaCsv(t.fecha_creacion),
+    limite: t.fecha_limite ? fechaCsv(t.fecha_limite) : '',
+    hecha: fechaCsv(t.fecha_hecho),
+  }
+}
+
 const thClass = 'text-left px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400'
 const tdBase = 'px-4 py-2.5'
 
@@ -22,6 +60,23 @@ export default function Reports({ userProfile }) {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
   const [tab, setTab] = useState('Por Estado')
+  /**
+   * Grupos abiertos, por clave. Arrancan cerrados: con 90 tareas, abrir todo
+   * de entrada entierra los conteos, que es justamente el resumen que se busca
+   * al entrar a un reporte.
+   * Groups start collapsed: with 90 tasks, expanding everything buries the
+   * counts, which are the summary the reader came for.
+   */
+  const [abiertos, setAbiertos] = useState(() => new Set())
+
+  const estaAbierto = (clave) => abiertos.has(clave)
+  const alternar = (clave) =>
+    setAbiertos((prev) => {
+      const siguiente = new Set(prev)
+      if (siguiente.has(clave)) siguiente.delete(clave)
+      else siguiente.add(clave)
+      return siguiente
+    })
 
   useEffect(() => {
     async function fetchAll() {
@@ -68,6 +123,42 @@ export default function Reports({ userProfile }) {
 
   const byFecha = [...tasks]
 
+  // Claves de los grupos de la pestaña activa. Sirven para "expandir todo" y
+  // para saber si ya está todo abierto.
+  const clavesDeLaPestana =
+    tab === 'Por Estado'
+      ? byEstado.map(({ estado }) => `estado:${estado}`)
+      : tab === 'Por Asignado'
+        ? byAsignado.map(({ nombre }) => `asignado:${nombre}`)
+        : ['fecha:todas']
+
+  const todoAbierto =
+    clavesDeLaPestana.length > 0 && clavesDeLaPestana.every((c) => abiertos.has(c))
+
+  function alternarTodo() {
+    setAbiertos((prev) => {
+      const siguiente = new Set(prev)
+      if (todoAbierto) clavesDeLaPestana.forEach((c) => siguiente.delete(c))
+      else clavesDeLaPestana.forEach((c) => siguiente.add(c))
+      return siguiente
+    })
+  }
+
+  function exportar() {
+    let filas
+    if (tab === 'Por Estado') {
+      filas = byEstado.flatMap(({ estado, tasks: g }) => g.map((t) => filaCsv(t, estado)))
+    } else if (tab === 'Por Asignado') {
+      filas = byAsignado.flatMap(({ nombre, tasks: g }) => g.map((t) => filaCsv(t, nombre)))
+    } else {
+      filas = byFecha.map((t) => filaCsv(t, ''))
+    }
+    descargarCsv(nombreArchivoCsv(tab), construirCsv(COLUMNAS_CSV, filas))
+  }
+
+  const btnBarra =
+    'text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50'
+
   const tableWrap = 'bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'
   const tableClass = 'w-full text-sm min-w-[480px]'
   const theadClass = 'bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700'
@@ -97,15 +188,32 @@ export default function Reports({ userProfile }) {
         </div>
       </div>
 
+      {/* Acciones de la pestaña */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button type="button" onClick={alternarTodo} className={btnBarra}>
+          {todoAbierto ? 'Colapsar todo' : 'Expandir todo'}
+        </button>
+        <button type="button" onClick={exportar} disabled={tasks.length === 0} className={btnBarra}>
+          ⬇ Exportar CSV
+        </button>
+        <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+          {tasks.length} tarea{tasks.length !== 1 ? 's' : ''} en total
+        </span>
+      </div>
+
       {/* Por Estado */}
       {tab === 'Por Estado' && (
         <div className="space-y-5">
           {byEstado.map(({ estado, tasks: group }) => (
-            <div key={estado}>
-              <div className="flex items-center gap-2 mb-2">
+            <CollapsibleGroup
+              key={estado}
+              conteo={group.length}
+              abierto={estaAbierto(`estado:${estado}`)}
+              onAlternar={() => alternar(`estado:${estado}`)}
+              insignia={
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${ESTADO_STYLE[estado]}`}>{estado}</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">{group.length} tarea{group.length !== 1 ? 's' : ''}</span>
-              </div>
+              }
+            >
               {group.length === 0 ? (
                 <p className="text-sm text-gray-400 dark:text-gray-500 pl-2">Sin tareas.</p>
               ) : (
@@ -134,7 +242,7 @@ export default function Reports({ userProfile }) {
                   </div>
                 </div>
               )}
-            </div>
+            </CollapsibleGroup>
           ))}
         </div>
       )}
@@ -143,11 +251,13 @@ export default function Reports({ userProfile }) {
       {tab === 'Por Asignado' && (
         <div className="space-y-5">
           {byAsignado.map(({ nombre, tasks: group }) => (
-            <div key={nombre}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">👤 {nombre}</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">({group.length})</span>
-              </div>
+            <CollapsibleGroup
+              key={nombre}
+              titulo={`👤 ${nombre}`}
+              conteo={group.length}
+              abierto={estaAbierto(`asignado:${nombre}`)}
+              onAlternar={() => alternar(`asignado:${nombre}`)}
+            >
               <div className={tableWrap}>
                 <div className="overflow-x-auto">
                   <table className={tableClass}>
@@ -174,13 +284,19 @@ export default function Reports({ userProfile }) {
                   </table>
                 </div>
               </div>
-            </div>
+            </CollapsibleGroup>
           ))}
         </div>
       )}
 
       {/* Por Fecha */}
       {tab === 'Por Fecha' && (
+        <CollapsibleGroup
+          titulo="📅 Todas las tareas por fecha"
+          conteo={byFecha.length}
+          abierto={estaAbierto('fecha:todas')}
+          onAlternar={() => alternar('fecha:todas')}
+        >
         <div className={tableWrap}>
           <div className="overflow-x-auto">
             <table className={tableClass}>
@@ -219,6 +335,7 @@ export default function Reports({ userProfile }) {
             <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">Sin tareas.</div>
           )}
         </div>
+        </CollapsibleGroup>
       )}
     </div>
   )
