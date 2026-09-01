@@ -199,6 +199,14 @@ Con el registro público apagado, el alta la hace el Administrador — pero quie
 
 El mensaje de confirmación es el mismo exista o no la cuenta, para no convertir la pantalla en un detector de correos registrados.
 
+**Longitud mínima de contraseña: 8 caracteres.** El valor vive en una sola constante, `MIN_PASSWORD_LENGTH` en `src/utils/validation.js`, de donde salen la validación, los `minLength` y los textos de ayuda.
+
+> ⚠️ **La validación del cliente no es un control de seguridad.** Corre en el navegador y se puede saltar llamando a la API directamente. El límite que de verdad manda se configura en **Supabase → Authentication → Providers → Email → Minimum password length**, y hay que dejarlo en 8 para que coincida. La documentación de Supabase advierte que menos de 8 no es recomendable.
+>
+> Ahí mismo se pueden exigir clases de caracteres (dígitos, mayúsculas, símbolos). No se activaron: si se activan en Supabase sin reflejarlo en el cliente, el usuario recibe un rechazo del servidor que la interfaz no supo anticipar.
+>
+> En plan Pro, Supabase además puede rechazar contraseñas filtradas consultando HaveIBeenPwned. Vale la pena si el proyecto sube de plan.
+
 > ⚠️ **Requiere SMTP propio.** El servicio de correo por defecto de Supabase solo entrega a direcciones del equipo del proyecto y permite ~2 mensajes por hora; el resto recibe *Email address not authorized*. La documentación de Supabase indica que no es para producción. **Sin SMTP configurado en Authentication → Emails → SMTP Settings, esta pantalla existe pero los correos no llegan al personal.**
 
 > El `redirectTo` usa `window.location.origin`, así que la URL del despliegue debe estar en *Redirect URLs*.
@@ -365,6 +373,8 @@ Before publishing, in Supabase: turn off *Allow new users to sign up*, set *Site
 ### 🔑 Password reset
 
 Public sign-up is off, so accounts are created by an Administrator — but users still need to recover forgotten passwords. The flow is implemented: *Forgot your password?* on the login screen calls `resetPasswordForEmail`; `index.html` flags the recovery arrival before the bundle loads (the Supabase client consumes and clears the URL fragment on init), and `App.jsx` intercepts to render `UpdatePassword.jsx` instead of the app. The confirmation message is identical whether or not the account exists, to avoid user enumeration.
+
+**Minimum password length: 8 characters**, defined once as `MIN_PASSWORD_LENGTH` in `src/utils/validation.js`. Client-side validation is a convenience, not a security control — set the same minimum under Supabase → Authentication → Providers → Email → Minimum password length, which is where it is actually enforced.
 
 > ⚠️ **Requires custom SMTP.** Supabase's built-in email service only delivers to project team addresses and allows about 2 messages per hour; everyone else gets *Email address not authorized*. Without SMTP configured under Authentication → Emails, the screen exists but no mail reaches staff.
 

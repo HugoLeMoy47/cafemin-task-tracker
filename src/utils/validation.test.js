@@ -4,6 +4,7 @@ import {
   validateEmail,
   validatePassword,
   validatePasswordChange,
+  MIN_PASSWORD_LENGTH,
   validateTaskPayload,
   validateImageFile,
 } from './validation.js'
@@ -56,13 +57,19 @@ describe('validateEmail', () => {
 })
 
 describe('validatePassword', () => {
-  it('acepta 6 caracteres o más / accepts 6+ characters', () => {
-    expect(validatePassword('123456')).toBe(true)
+  it('el mínimo es de al menos 8 / the minimum is at least 8', () => {
+    // Blinda la decisión: bajarlo debe romper la prueba, no pasar inadvertido.
+    // Guards the decision: lowering it must break the test, not slip through.
+    expect(MIN_PASSWORD_LENGTH).toBeGreaterThanOrEqual(8)
+  })
+
+  it('acepta el mínimo exacto y más / accepts exactly the minimum and above', () => {
+    expect(validatePassword('a'.repeat(MIN_PASSWORD_LENGTH))).toBe(true)
     expect(validatePassword('contraseña-larga-segura')).toBe(true)
   })
 
-  it('rechaza menos de 6 caracteres / rejects fewer than 6 characters', () => {
-    expect(validatePassword('12345')).toBe(false)
+  it('rechaza uno menos que el mínimo / rejects one below the minimum', () => {
+    expect(validatePassword('a'.repeat(MIN_PASSWORD_LENGTH - 1))).toBe(false)
     expect(validatePassword('')).toBe(false)
   })
 
@@ -146,31 +153,32 @@ describe('validateImageFile', () => {
 
 describe('validatePasswordChange', () => {
   it('acepta dos contraseñas iguales y suficientemente largas / accepts a valid pair', () => {
-    expect(validatePasswordChange({ password: 'abc123', confirmacion: 'abc123' })).toBeNull()
+    expect(validatePasswordChange({ password: 'abc12345', confirmacion: 'abc12345' })).toBeNull()
   })
 
   it('rechaza contraseñas cortas antes de comparar / rejects short passwords first', () => {
     expect(validatePasswordChange({ password: '123', confirmacion: '123' })).toMatch(
-      /al menos 6 caracteres/
+      new RegExp(`al menos ${MIN_PASSWORD_LENGTH} caracteres`)
     )
   })
 
   it('rechaza cuando no coinciden / rejects a mismatch', () => {
-    expect(validatePasswordChange({ password: 'abc123', confirmacion: 'abc124' })).toMatch(
+    expect(validatePasswordChange({ password: 'abc12345', confirmacion: 'abc12346' })).toMatch(
       /no coinciden/
     )
   })
 
   it('distingue mayúsculas al comparar / comparison is case sensitive', () => {
-    expect(validatePasswordChange({ password: 'Secreto1', confirmacion: 'secreto1' })).toMatch(
+    expect(validatePasswordChange({ password: 'Secreto12', confirmacion: 'secreto12' })).toMatch(
       /no coinciden/
     )
   })
 
   it('rechaza entradas ausentes o de tipo inesperado / rejects missing or odd input', () => {
-    expect(validatePasswordChange({ password: '', confirmacion: '' })).toMatch(/al menos 6/)
-    expect(validatePasswordChange({ password: null, confirmacion: null })).toMatch(/al menos 6/)
-    expect(validatePasswordChange({})).toMatch(/al menos 6/)
-    expect(validatePasswordChange({ password: 123456, confirmacion: 123456 })).toMatch(/al menos 6/)
+    const corta = new RegExp(`al menos ${MIN_PASSWORD_LENGTH}`)
+    expect(validatePasswordChange({ password: '', confirmacion: '' })).toMatch(corta)
+    expect(validatePasswordChange({ password: null, confirmacion: null })).toMatch(corta)
+    expect(validatePasswordChange({})).toMatch(corta)
+    expect(validatePasswordChange({ password: 12345678, confirmacion: 12345678 })).toMatch(corta)
   })
 })

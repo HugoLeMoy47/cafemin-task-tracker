@@ -5,7 +5,27 @@ export const validateEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
 }
 
-export const validatePassword = (password) => typeof password === 'string' && password.length >= 6
+/**
+ * Longitud mínima de contraseña.
+ * Minimum password length.
+ *
+ * Ocho es el piso que recomienda la propia documentación de Supabase
+ * ("anything less than 8 characters is not recommended"). El sistema maneja
+ * datos de personas en situación de vulnerabilidad, así que no se baja de ahí.
+ *
+ * ⚠️ Esta comprobación es de CONVENIENCIA, no un control de seguridad: corre en
+ * el navegador y se puede saltar. El límite real se configura en Supabase →
+ * Authentication → Providers → Email → Minimum password length, y debe
+ * mantenerse igual que este valor.
+ *
+ * This check is a CONVENIENCE, not a security control: it runs in the browser
+ * and can be bypassed. The real limit lives in the Supabase dashboard and must
+ * be kept in sync with this value.
+ */
+export const MIN_PASSWORD_LENGTH = 8
+
+export const validatePassword = (password) =>
+  typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH
 
 export const validateTaskPayload = ({ nombre, detalles }) => {
   const name = normalizeText(nombre)
@@ -32,7 +52,7 @@ export const validateTaskPayload = ({ nombre, detalles }) => {
  */
 export const validatePasswordChange = ({ password, confirmacion }) => {
   if (!validatePassword(password)) {
-    return 'La contraseña debe tener al menos 6 caracteres. / Password must be at least 6 characters.'
+    return `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres. / Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
   }
   if (password !== confirmacion) {
     return 'Las contraseñas no coinciden. / Passwords do not match.'

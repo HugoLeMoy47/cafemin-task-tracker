@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { DEMO_MODE } from '../config'
+import { MIN_PASSWORD_LENGTH } from '../utils/validation'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -129,9 +130,9 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={MIN_PASSWORD_LENGTH}
               className={inputClass}
-              placeholder="Mínimo 6 caracteres"
+              placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
             />
           </div>
           )}

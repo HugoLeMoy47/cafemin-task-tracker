@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { validatePasswordChange } from '../utils/validation'
+import { validatePasswordChange, MIN_PASSWORD_LENGTH } from '../utils/validation'
 
 /**
  * Pantalla para definir una contraseña nueva tras seguir el enlace de
@@ -81,10 +81,10 @@ export default function UpdatePassword({ onListo }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={MIN_PASSWORD_LENGTH}
                 autoComplete="new-password"
                 className={inputClass}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
               />
             </div>
             <div>
@@ -96,7 +96,7 @@ export default function UpdatePassword({ onListo }) {
                 value={confirmacion}
                 onChange={(e) => setConfirmacion(e.target.value)}
                 required
-                minLength={6}
+                minLength={MIN_PASSWORD_LENGTH}
                 autoComplete="new-password"
                 className={inputClass}
                 placeholder="La misma de arriba"

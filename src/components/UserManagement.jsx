@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, createTransientClient } from '../supabaseClient'
-import { validateEmail, validatePassword } from '../utils/validation'
+import { validateEmail, validatePassword, MIN_PASSWORD_LENGTH } from '../utils/validation'
 
 const ROLES = ['Administrador', 'Gestor', 'Asignado']
 
@@ -60,7 +60,7 @@ export default function UserManagement() {
       return
     }
     if (!validatePassword(form.password)) {
-      setCreateError('La contraseña debe tener al menos 6 caracteres.')
+      setCreateError(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
       setCreating(false)
       return
     }
@@ -149,9 +149,9 @@ export default function UserManagement() {
             </div>
             <div>
               <label className={labelClass}>Contraseña temporal *</label>
-              <input type="text" required minLength={6} value={form.password}
+              <input type="text" required minLength={MIN_PASSWORD_LENGTH} value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                className={inputClass} placeholder="Mínimo 6 caracteres" />
+                className={inputClass} placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`} />
             </div>
             <div>
               <label className={labelClass}>Rol *</label>
