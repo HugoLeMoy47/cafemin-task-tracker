@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { ESTADOS } from '../../lib/reportes'
+import { COLOR_ESTADO, textoPrimario, textoTenue, useTooltip } from './base'
 
 /**
  * Gráficas de los reportes, en SVG hecho a mano.
@@ -20,61 +20,7 @@ import { ESTADOS } from '../../lib/reportes'
  * No chart library on purpose. Text wears text tokens, never the series color.
  */
 
-const COLOR_ESTADO = {
-  Pendiente: 'var(--viz-pendiente)',
-  'En curso': 'var(--viz-encurso)',
-  Hecho: 'var(--viz-hecho)',
-}
-
-const textoPrimario = 'fill-gray-700 dark:fill-gray-200'
-const textoTenue = 'fill-gray-500 dark:fill-gray-400'
-
-/* ------------------------------------------------------------------ */
-/* Piezas compartidas / Shared pieces                                  */
-/* ------------------------------------------------------------------ */
-
-function useTooltip() {
-  const [tip, setTip] = useState(null)
-
-  const manejadores = (contenido) => ({
-    onMouseEnter: (e) => mover(e, contenido),
-    onMouseMove: (e) => mover(e, contenido),
-    onMouseLeave: () => setTip(null),
-    // Foco por teclado: el tooltip no puede depender solo del ratón.
-    // Keyboard focus: the tooltip cannot be mouse-only.
-    onFocus: (e) => {
-      const caja = e.currentTarget.getBoundingClientRect()
-      const padre = e.currentTarget.closest('[data-viz-marco]')?.getBoundingClientRect()
-      if (!padre) return
-      setTip({
-        x: caja.left - padre.left + caja.width / 2,
-        y: caja.top - padre.top,
-        contenido,
-      })
-    },
-    onBlur: () => setTip(null),
-  })
-
-  function mover(e, contenido) {
-    const padre = e.currentTarget.closest('[data-viz-marco]')?.getBoundingClientRect()
-    if (!padre) return
-    setTip({ x: e.clientX - padre.left, y: e.clientY - padre.top, contenido })
-  }
-
-  const nodo = tip ? (
-    <div
-      role="status"
-      className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 dark:bg-gray-700 px-2.5 py-1.5 text-xs text-white shadow-lg whitespace-nowrap"
-      style={{ left: tip.x, top: tip.y - 8 }}
-    >
-      {tip.contenido}
-    </div>
-  ) : null
-
-  return { manejadores, nodo }
-}
-
-function Marco({ titulo, descripcion, children }) {
+export function Marco({ titulo, descripcion, children }) {
   return (
     <figure className="relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-5" data-viz-marco>
       <figcaption className="mb-3">
@@ -88,7 +34,7 @@ function Marco({ titulo, descripcion, children }) {
   )
 }
 
-function Leyenda({ series }) {
+export function Leyenda({ series }) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 mb-3 list-none p-0 m-0">
       {series.map(({ etiqueta, color }) => (

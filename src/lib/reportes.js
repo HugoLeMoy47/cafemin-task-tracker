@@ -116,3 +116,174 @@ export function serieSemanal(tareas, semanas = 10, referencia = new Date()) {
 
   return cubos
 }
+
+/* ==================================================================== */
+/* Métricas de desempeño                                                */
+/*                                                                      */
+/* Las tareas sin `fecha_inicio` quedan FUERA de los promedios y se      */
+/* cuentan aparte. Esa columna se llena hacia adelante desde su          */
+/* migración, así que el histórico previo no la tiene; promediar sobre   */
+/* ella como si fuera cero inventaría un desempeño que nadie midió.      */
+/*                                                                      */
+/* Tasks without `fecha_inicio` are excluded from averages and counted   */
+/* separately: that column only fills forward, so averaging over it as   */
+/* if it were zero would invent performance nobody measured.             */
+/* ==================================================================== */
+
+const DIA_MS = 86400000
+
+/** Diferencia en días entre dos fechas ISO. null si falta alguna. */
+export function dias(desde, hasta) {
+  if (!desde || !hasta) return null
+  const a = new Date(desde).getTime()
+  const b = new Date(hasta).getTime()
+  if (Number.isNaN(a) || Number.isNaN(b)) return null
+  return (b - a) / DIA_MS
+}
+
+function promedio(valores) {
+  const utiles = valores.filter((v) => v !== null && Number.isFinite(v))
+  if (utiles.length === 0) return null
+  return utiles.reduce((a, v) => a + v, 0) / utiles.length
+}
+
+export function estaVencida(t, ahora = new Date()) {
+  if (!t.fecha_limite || t.estado === 'Hecho') return false
+  const limite = new Date(t.fecha_limite)
+  if (Number.isNaN(limite.getTime())) return false
+  const hoy = new Date(ahora)
+  hoy.setHours(0, 0, 0, 0)
+  return limite < hoy
+}
+
+/**
+ * Cifras de encabezado y tiempos del flujo completo.
+ * Headline figures and end-to-end flow times.
+ */
+export function metricasGlobales(tareas, ahora = new Date()) {
+  const hechas = tareas.filter((t) => t.estado === 'Hecho')
+  const enCurso = tareas.filter((t) => t.estado === 'En curso')
+  const pendientes = tareas.filter((t) => t.estado === 'Pendiente')
+
+  // Arrancaron = tienen sello de inicio, sin importar dónde estén ahora.
+  const arrancaron = tareas.filter((t) => t.fecha_inicio)
+  const cerradasMedibles = hechas.filter((t) => t.fecha_inicio)
+
+  return {
+    total: tareas.length,
+    pendientes: pendientes.length,
+    enCurso: enCurso.length,
+    hechas: hechas.length,
+    arrancaron: arrancaron.length,
+    vencidas: tareas.filter((t) => estaVencida(t, ahora)).length,
+    porcentajeCerradas: tareas.length ? Math.round((hechas.length / tareas.length) * 100) : 0,
+    esperaMedia: promedio(arrancaron.map((t) => dias(t.fecha_creacion, t.fecha_inicio))),
+    trabajoMedio: promedio(cerradasMedibles.map((t) => dias(t.fecha_inicio, t.fecha_hecho))),
+    totalMedio: promedio(hechas.map((t) => dias(t.fecha_creacion, t.fecha_hecho))),
+    // Cerradas antes de que existiera la marca de inicio: se nombran para que
+    // nadie lea los promedios como si cubrieran todo el histórico.
+    sinMedicion: hechas.filter((t) => !t.fecha_inicio).length,
+  }
+}
+
+/**
+ * Desempeño por persona: espera contra trabajo.
+ *
+ * Ambas se miden sobre la MISMA población —las tareas cerradas que tienen
+ * marca de inicio— para que su suma sea un tiempo de ciclo real. Promediar la
+ * espera sobre todas las iniciadas y el trabajo solo sobre las cerradas daría
+ * dos cifras de universos distintos, y sumarlas no significaría nada.
+ *
+ * Both are measured over the SAME population --closed tasks with a start
+ * stamp-- so their sum is a real cycle time. Averaging waiting over every
+ * started task and working over only the closed ones would mix two universes,
+ * and adding them would mean nothing.
+ *
+ * Ambas en días, así que se apilan en una sola escala en vez de recurrir a dos
+ * ejes, que sería la forma más común de mentir con un gráfico.
+ */
+export function metricasPorPersona(tareas) {
+  const mapa = new Map()
+
+  for (const t of tareas) {
+    const nombre = t.asignado?.nombre_completo || SIN_ASIGNAR
+    if (!mapa.has(nombre)) mapa.set(nombre, { nombre, esperas: [], trabajos: [], cerradas: 0, abiertas: 0 })
+    const f = mapa.get(nombre)
+
+    if (t.estado === 'Hecho') f.cerradas += 1
+    else f.abiertas += 1
+
+    if (t.estado === 'Hecho' && t.fecha_inicio) {
+      f.esperas.push(dias(t.fecha_creacion, t.fecha_inicio))
+      f.trabajos.push(dias(t.fecha_inicio, t.fecha_hecho))
+    }
+  }
+
+  return [...mapa.values()]
+    .map(({ nombre, esperas, trabajos, cerradas, abiertas }) => {
+      const espera = promedio(esperas)
+      const trabajo = promedio(trabajos)
+      return {
+        nombre,
+        cerradas,
+        abiertas,
+        espera,
+        trabajo,
+        total: espera === null && trabajo === null ? null : (espera || 0) + (trabajo || 0),
+        medibles: trabajos.length,
+      }
+    })
+    .sort((a, b) => (b.total ?? -1) - (a.total ?? -1) || a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+/**
+ * Tareas que se repiten, agrupadas por nombre exacto.
+ * @param {number} minimo cuántas repeticiones para considerarla recurrente
+ */
+export function tareasRecurrentes(tareas, minimo = 2) {
+  const mapa = new Map()
+
+  for (const t of tareas) {
+    const clave = (t.nombre || '').trim()
+    if (!clave) continue
+    if (!mapa.has(clave)) mapa.set(clave, { nombre: clave, veces: 0, cerradas: 0, duraciones: [] })
+    const f = mapa.get(clave)
+    f.veces += 1
+    if (t.estado === 'Hecho') {
+      f.cerradas += 1
+      f.duraciones.push(dias(t.fecha_creacion, t.fecha_hecho))
+    }
+  }
+
+  return [...mapa.values()]
+    .filter((f) => f.veces >= minimo)
+    .map(({ nombre, veces, cerradas, duraciones }) => ({
+      nombre,
+      veces,
+      cerradas,
+      totalMedio: promedio(duraciones),
+    }))
+    .sort((a, b) => b.veces - a.veces || a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+/**
+ * Carga por dimensión del catálogo (categoría o área).
+ * @param {'categoria'|'area'} dimension
+ */
+export function cargaPorDimension(tareas, dimension) {
+  const mapa = new Map()
+
+  for (const t of tareas) {
+    const nombre = t[dimension]?.nombre || 'Sin asignar'
+    if (!mapa.has(nombre)) {
+      mapa.set(nombre, { nombre, Pendiente: 0, 'En curso': 0, Hecho: 0, total: 0 })
+    }
+    const f = mapa.get(nombre)
+    if (ESTADOS.includes(t.estado)) f[t.estado] += 1
+    f.total += 1
+  }
+
+  return [...mapa.values()].sort(
+    (a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es')
+  )
+}

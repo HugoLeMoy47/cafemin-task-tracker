@@ -4,8 +4,12 @@ import CollapsibleGroup from './reports/CollapsibleGroup'
 import { construirCsv, descargarCsv, fechaCsv, nombreArchivoCsv } from '../lib/csv'
 import { resumenPorEstado, resumenPorAsignado, serieSemanal } from '../lib/reportes'
 import { GraficaEstado, GraficaAsignado, GraficaSemanal } from './reports/graficas'
+import Dashboard from './reports/Dashboard'
 
-const TABS = ['Por Estado', 'Por Asignado', 'Por Fecha']
+// 'Resumen' va primero y es la pestaña inicial: quien entra a reportes quiere
+// saber cómo va todo antes de escarbar en un listado.
+// 'Resumen' comes first and is the landing tab.
+const TABS = ['Resumen', 'Por Estado', 'Por Asignado', 'Por Fecha']
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -61,7 +65,7 @@ export default function Reports({ userProfile }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
-  const [tab, setTab] = useState('Por Estado')
+  const [tab, setTab] = useState('Resumen')
   /**
    * Grupos abiertos, por clave. Arrancan cerrados: con 90 tareas, abrir todo
    * de entrada entierra los conteos, que es justamente el resumen que se busca
@@ -132,7 +136,9 @@ export default function Reports({ userProfile }) {
       ? byEstado.map(({ estado }) => `estado:${estado}`)
       : tab === 'Por Asignado'
         ? byAsignado.map(({ nombre }) => `asignado:${nombre}`)
-        : ['fecha:todas']
+        : tab === 'Por Fecha'
+          ? ['fecha:todas']
+          : []
 
   const todoAbierto =
     clavesDeLaPestana.length > 0 && clavesDeLaPestana.every((c) => abiertos.has(c))
@@ -190,7 +196,12 @@ export default function Reports({ userProfile }) {
         </div>
       </div>
 
-      {/* Acciones de la pestaña */}
+      {/* Resumen general */}
+      {tab === 'Resumen' && <Dashboard tareas={tasks} />}
+
+      {/* Acciones de la pestaña. El resumen no agrupa filas ni lista tareas,
+          así que ni colapsar ni exportar aplican ahí. */}
+      {tab !== 'Resumen' && (
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <button type="button" onClick={alternarTodo} className={btnBarra}>
           {todoAbierto ? 'Colapsar todo' : 'Expandir todo'}
@@ -202,6 +213,7 @@ export default function Reports({ userProfile }) {
           {tasks.length} tarea{tasks.length !== 1 ? 's' : ''} en total
         </span>
       </div>
+      )}
 
       {/* Por Estado */}
       {tab === 'Por Estado' && (

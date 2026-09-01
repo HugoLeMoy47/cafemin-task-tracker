@@ -6,6 +6,12 @@ import {
   resumenPorAsignado,
   resumenPorEstado,
   serieSemanal,
+  dias,
+  estaVencida,
+  metricasGlobales,
+  metricasPorPersona,
+  tareasRecurrentes,
+  cargaPorDimension,
 } from './reportes.js'
 
 const tarea = (over = {}) => ({
@@ -172,5 +178,213 @@ describe('serieSemanal', () => {
   it('etiqueta cada semana con día y mes / labels each week', () => {
     const s = serieSemanal([], 2, REF)
     expect(s[1].etiqueta).toBe('31 ago')
+  })
+})
+
+/* ---------------------------------------------------------------- */
+/* Métricas de desempeño                                            */
+/* ---------------------------------------------------------------- */
+
+const iso = (d) => new Date(d).toISOString()
+const AHORA = new Date(2026, 8, 10, 12, 0)
+
+describe('dias', () => {
+  it('mide la diferencia en días / measures the gap in days', () => {
+    expect(dias(iso('2026-09-01T00:00:00Z'), iso('2026-09-03T00:00:00Z'))).toBe(2)
+    expect(dias(iso('2026-09-01T00:00:00Z'), iso('2026-09-01T12:00:00Z'))).toBe(0.5)
+  })
+
+  it('devuelve null si falta un extremo / null when an end is missing', () => {
+    expect(dias(null, iso('2026-09-01T00:00:00Z'))).toBeNull()
+    expect(dias(iso('2026-09-01T00:00:00Z'), null)).toBeNull()
+    expect(dias('no-es-fecha', iso('2026-09-01T00:00:00Z'))).toBeNull()
+  })
+})
+
+describe('estaVencida', () => {
+  it('marca vencida una tarea abierta con límite pasado', () => {
+    expect(estaVencida({ estado: 'Pendiente', fecha_limite: '2026-09-01' }, AHORA)).toBe(true)
+  })
+
+  it('una tarea Hecha nunca está vencida / a done task is never overdue', () => {
+    expect(estaVencida({ estado: 'Hecho', fecha_limite: '2026-09-01' }, AHORA)).toBe(false)
+  })
+
+  it('el límite de hoy todavía no vence / today is not yet overdue', () => {
+    expect(estaVencida({ estado: 'Pendiente', fecha_limite: '2026-09-10' }, AHORA)).toBe(false)
+  })
+
+  it('sin límite no vence / no due date, no overdue', () => {
+    expect(estaVencida({ estado: 'Pendiente', fecha_limite: null }, AHORA)).toBe(false)
+  })
+})
+
+describe('metricasGlobales', () => {
+  const base = [
+    // cerrada y medible: espera 1 d, trabajo 2 d, total 3 d
+    {
+      estado: 'Hecho',
+      fecha_creacion: iso('2026-09-01T00:00:00Z'),
+      fecha_inicio: iso('2026-09-02T00:00:00Z'),
+      fecha_hecho: iso('2026-09-04T00:00:00Z'),
+    },
+    // cerrada SIN sello de inicio (histórico previo a la migración)
+    {
+      estado: 'Hecho',
+      fecha_creacion: iso('2026-09-01T00:00:00Z'),
+      fecha_inicio: null,
+      fecha_hecho: iso('2026-09-09T00:00:00Z'),
+    },
+    { estado: 'En curso', fecha_creacion: iso('2026-09-05T00:00:00Z'), fecha_inicio: iso('2026-09-08T00:00:00Z'), fecha_hecho: null },
+    { estado: 'Pendiente', fecha_creacion: iso('2026-09-06T00:00:00Z'), fecha_inicio: null, fecha_hecho: null, fecha_limite: '2026-09-01' },
+  ]
+
+  it('cuenta los estados y el porcentaje cerrado', () => {
+    const m = metricasGlobales(base, AHORA)
+    expect(m).toMatchObject({ total: 4, hechas: 2, enCurso: 1, pendientes: 1, porcentajeCerradas: 50 })
+  })
+
+  it('cuenta las vencidas / counts overdue', () => {
+    expect(metricasGlobales(base, AHORA).vencidas).toBe(1)
+  })
+
+  it('EXCLUYE de los promedios las tareas sin sello de inicio', () => {
+    const m = metricasGlobales(base, AHORA)
+    // espera: (1 d de la cerrada + 3 d de la que está en curso) / 2 = 2
+    expect(m.esperaMedia).toBe(2)
+    // trabajo: solo la cerrada medible = 2 d. Si la cerrada sin sello contara
+    // como cero, saldría 1 e inventaría un desempeño que nadie midió.
+    expect(m.trabajoMedio).toBe(2)
+  })
+
+  it('nombra cuántas cerradas quedaron sin medición', () => {
+    expect(metricasGlobales(base, AHORA).sinMedicion).toBe(1)
+  })
+
+  it('el tiempo total sí incluye las cerradas sin sello', () => {
+    // (3 d + 8 d) / 2 = 5.5 — creación y cierre existen en ambas
+    expect(metricasGlobales(base, AHORA).totalMedio).toBe(5.5)
+  })
+
+  it('sin tareas devuelve nulos en vez de ceros / nulls, not zeros, when empty', () => {
+    const m = metricasGlobales([], AHORA)
+    expect(m.total).toBe(0)
+    expect(m.esperaMedia).toBeNull()
+    expect(m.trabajoMedio).toBeNull()
+    expect(m.porcentajeCerradas).toBe(0)
+  })
+})
+
+describe('metricasPorPersona', () => {
+  const p = (nombre, over) => ({ asignado: { nombre_completo: nombre }, ...over })
+
+  it('separa espera de trabajo / splits waiting from working', () => {
+    const r = metricasPorPersona([
+      p('Ana', {
+        estado: 'Hecho',
+        fecha_creacion: iso('2026-09-01T00:00:00Z'),
+        fecha_inicio: iso('2026-09-03T00:00:00Z'),
+        fecha_hecho: iso('2026-09-04T00:00:00Z'),
+      }),
+    ])
+    expect(r[0]).toMatchObject({ nombre: 'Ana', espera: 2, trabajo: 1, total: 3, cerradas: 1, abiertas: 0 })
+  })
+
+  it('cuenta abiertas aparte de cerradas', () => {
+    const r = metricasPorPersona([
+      p('Ana', { estado: 'Pendiente', fecha_creacion: iso('2026-09-01T00:00:00Z'), fecha_inicio: null }),
+      p('Ana', { estado: 'En curso', fecha_creacion: iso('2026-09-01T00:00:00Z'), fecha_inicio: iso('2026-09-02T00:00:00Z') }),
+    ])
+    expect(r[0]).toMatchObject({ cerradas: 0, abiertas: 2 })
+  })
+
+  it('una tarea EN CURSO no entra en los promedios / in-progress tasks are excluded', () => {
+    // Su espera es medible, pero su trabajo no ha terminado. Si contara solo
+    // en la espera, la suma mezclaria dos poblaciones y dejaria de ser un
+    // tiempo de ciclo.
+    const r = metricasPorPersona([
+      p('Ana', {
+        estado: 'Hecho',
+        fecha_creacion: iso('2026-09-01T00:00:00Z'),
+        fecha_inicio: iso('2026-09-02T00:00:00Z'),
+        fecha_hecho: iso('2026-09-03T00:00:00Z'),
+      }),
+      p('Ana', {
+        estado: 'En curso',
+        fecha_creacion: iso('2026-09-01T00:00:00Z'),
+        fecha_inicio: iso('2026-09-09T00:00:00Z'), // 8 dias de espera
+        fecha_hecho: null,
+      }),
+    ])
+    // Si la de En curso contara, la espera media seria 4.5 en vez de 1.
+    expect(r[0].espera).toBe(1)
+    expect(r[0].trabajo).toBe(1)
+    expect(r[0].total).toBe(2)
+    expect(r[0].medibles).toBe(1)
+  })
+
+  it('devuelve null, no cero, cuando no hay nada medible', () => {
+    const r = metricasPorPersona([
+      p('Ana', { estado: 'Pendiente', fecha_creacion: iso('2026-09-01T00:00:00Z'), fecha_inicio: null }),
+    ])
+    expect(r[0].espera).toBeNull()
+    expect(r[0].trabajo).toBeNull()
+    expect(r[0].total).toBeNull()
+  })
+})
+
+describe('tareasRecurrentes', () => {
+  const t = (nombre, estado, creada, hecha) => ({
+    nombre,
+    estado,
+    fecha_creacion: creada ? iso(creada) : null,
+    fecha_hecho: hecha ? iso(hecha) : null,
+  })
+
+  it('solo lista las que se repiten / only repeated names', () => {
+    const r = tareasRecurrentes([
+      t('Aseo', 'Hecho', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z'),
+      t('Aseo', 'Hecho', '2026-09-03T00:00:00Z', '2026-09-05T00:00:00Z'),
+      t('Poda', 'Pendiente'),
+    ])
+    expect(r.map((x) => x.nombre)).toEqual(['Aseo'])
+    expect(r[0]).toMatchObject({ veces: 2, cerradas: 2, totalMedio: 1.5 })
+  })
+
+  it('agrupa ignorando espacios alrededor / trims before grouping', () => {
+    const r = tareasRecurrentes([t('  Aseo  ', 'Pendiente'), t('Aseo', 'Pendiente')])
+    expect(r[0].veces).toBe(2)
+  })
+
+  it('ordena por frecuencia descendente / sorts by frequency', () => {
+    const r = tareasRecurrentes([
+      t('Aseo', 'Pendiente'), t('Aseo', 'Pendiente'),
+      t('Poda', 'Pendiente'), t('Poda', 'Pendiente'), t('Poda', 'Pendiente'),
+    ])
+    expect(r.map((x) => x.nombre)).toEqual(['Poda', 'Aseo'])
+  })
+
+  it('sin cierres el promedio es null, no cero', () => {
+    const r = tareasRecurrentes([t('Aseo', 'Pendiente'), t('Aseo', 'En curso')])
+    expect(r[0].totalMedio).toBeNull()
+  })
+})
+
+describe('cargaPorDimension', () => {
+  it('agrupa por categoría y desglosa por estado', () => {
+    const r = cargaPorDimension(
+      [
+        { estado: 'Hecho', categoria: { nombre: 'Limpieza' } },
+        { estado: 'Pendiente', categoria: { nombre: 'Limpieza' } },
+        { estado: 'Hecho', categoria: { nombre: 'Legal' } },
+      ],
+      'categoria'
+    )
+    expect(r[0]).toMatchObject({ nombre: 'Limpieza', total: 2, Hecho: 1, Pendiente: 1 })
+  })
+
+  it('agrupa lo que no trae dimensión / groups missing dimension', () => {
+    const r = cargaPorDimension([{ estado: 'Hecho', area: null }], 'area')
+    expect(r[0].nombre).toBe('Sin asignar')
   })
 })
