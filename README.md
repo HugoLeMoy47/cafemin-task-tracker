@@ -145,6 +145,24 @@ npm run format:check  # Verifica formato sin escribir
 
 ---
 
+### 🎭 Datos de demostración
+
+`supabase/seeds/` contiene la semilla para dejar el sistema listo para una presentación.
+
+1. **Crear las seis cuentas** en Authentication → Users → Add user, con *Auto Confirm* activado. No se pueden crear con SQL: `usuarios.id` referencia `auth.users(id)`. Los correos y nombres están listados en `01_cuentas_demo.sql`.
+2. Correr **`01_cuentas_demo.sql`** — corrige el nombre visible y asigna los roles (1 Administrador, 2 Gestores, 3 Asignados).
+3. Correr **`02_datos_demo.sql`** — amplía los catálogos y siembra 90 tareas: 55 hechas repartidas en diez semanas, 20 en curso y 15 pendientes, con dos sin asignar para que el reporte *Por Asignado* muestre el hueco.
+
+**Es re-ejecutable.** Córrelo antes de cada sesión y el dataset vuelve a quedar fresco. Todas las fechas son relativas a `now()`: escritas como fechas fijas, a mitad de una ronda de presentaciones el tablero mostraría solo tareas vencidas y ninguna próxima.
+
+**El borrado es quirúrgico.** Las tareas sembradas llevan un id con prefijo `cafede00-`, así que reiniciar no toca las tareas que alguien haya creado en vivo durante una demostración anterior.
+
+Si faltan cuentas, el script se detiene con un mensaje que las nombra en vez de sembrar datos a medias.
+
+> Las seis personas son **ficticias** a propósito: la demo vive en una URL pública. No uses nombres ni correos de personal real.
+
+---
+
 ### 🌐 Despliegue (Cloudflare Workers · static assets)
 
 La demostración pública vive en `https://cafemintt.freejolitos.consulting` como proyecto independiente de Cloudflare Workers con dominio personalizado. No hay código de Worker: solo se sirven los archivos estáticos que Vite construye en `dist/`. Al servirse desde la raíz del subdominio **no se requiere `base` en `vite.config.js`**.
