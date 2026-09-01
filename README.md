@@ -149,6 +149,8 @@ npm run format:check  # Verifica formato sin escribir
 
 `supabase/seeds/` contiene la semilla para dejar el sistema listo para una presentación.
 
+> ⚠️ **Orden importante:** corre antes la migración `add_fecha_inicio.sql`. La semilla escribe esa columna, así que sin la migración falla.
+
 1. **Crear las seis cuentas** en Authentication → Users → Add user, con *Auto Confirm* activado. No se pueden crear con SQL: `usuarios.id` referencia `auth.users(id)`. Los correos y nombres están listados en `01_cuentas_demo.sql`.
 2. Correr **`01_cuentas_demo.sql`** — corrige el nombre visible y asigna los roles (1 Administrador, 2 Gestores, 3 Asignados).
 3. Correr **`02_datos_demo.sql`** — amplía los catálogos y siembra 90 tareas: 55 hechas repartidas en diez semanas, 20 en curso y 15 pendientes, con dos sin asignar para que el reporte *Por Asignado* muestre el hueco.

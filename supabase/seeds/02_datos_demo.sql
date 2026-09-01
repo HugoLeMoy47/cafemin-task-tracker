@@ -102,6 +102,8 @@ declare
   i int;
   v_creada timestamptz;
   v_hecha timestamptz;
+  v_inicio timestamptz;
+  v_ritmo numeric;  -- fracción del tiempo total que la tarea pasó esperando
   v_asignado uuid;
   v_creador uuid;
   v_n int := 0;
@@ -155,16 +157,32 @@ begin
       + make_interval(hours => 8 + (i % 9));
     v_hecha := v_creada + make_interval(hours => 5 + (i * 7) % 60);
 
+    -- Cada persona tiene un ritmo distinto para TOMAR la tarea. Esa diferencia
+    -- es la que hace conversable el reporte Por Asignado: separa "tardó en
+    -- empezar" de "tardó en hacerla", que son problemas distintos.
+    -- Each person picks tasks up at a different pace; that difference is what
+    -- makes the per-assignee report worth discussing.
+    v_ritmo := (array[0.12, 0.40, 0.72])[1 + (i % 3)];
+    v_inicio := v_creada + (v_hecha - v_creada) * v_ritmo;
+
+    -- Una de cada once saltó directo a Hecho, sin pasar por En curso: el
+    -- trigger sella inicio = cierre y el tiempo de trabajo queda en cero.
+    -- Aparece a propósito para que el tablero muestre también ese caso.
+    -- One in eleven jumped straight to Hecho, so work time is zero.
+    if i % 11 = 0 then
+      v_inicio := v_hecha;
+    end if;
+
     v_asignado := v_asignados[1 + (i % 3)];
     v_creador  := case when i % 4 = 0 then v_admin else v_gestores[1 + (i % 2)] end;
     v_n := v_n + 1;
 
     insert into tareas (id, nombre, detalles, foto_requerida, evidencia_url,
-                        asignado_id, estado, fecha_creacion, fecha_hecho,
+                        asignado_id, estado, fecha_creacion, fecha_inicio, fecha_hecho,
                         categoria_id, area_trabajo_id, creado_por, fecha_limite)
     values (('cafede00-0000-4000-8000-' || lpad(v_n::text, 12, '0'))::uuid,
             v_partes[4], v_partes[5], v_partes[3] = '1', null,
-            v_asignado, 'Hecho', v_creada, v_hecha,
+            v_asignado, 'Hecho', v_creada, v_inicio, v_hecha,
             v_id_cat, v_id_area, v_creador, (v_creada + interval '2 days')::date);
   end loop;
 
@@ -185,6 +203,12 @@ begin
     select id into v_id_cat  from categorias     where nombre = v_partes[2];
 
     v_creada := now() - make_interval(days => 11 - (i % 11), hours => 3 + (i % 7));
+
+    -- Ya está en curso, así que por definición tiene inicio sellado.
+    -- It is in progress, so by definition it has a start stamp.
+    v_ritmo := (array[0.12, 0.40, 0.72])[1 + (i % 3)];
+    v_inicio := v_creada + (now() - v_creada) * v_ritmo;
+
     v_asignado := v_asignados[1 + (i % 3)];
     v_creador  := v_gestores[1 + (i % 2)];
     v_n := v_n + 1;
@@ -197,11 +221,11 @@ begin
     end;
 
     insert into tareas (id, nombre, detalles, foto_requerida, evidencia_url,
-                        asignado_id, estado, fecha_creacion, fecha_hecho,
+                        asignado_id, estado, fecha_creacion, fecha_inicio, fecha_hecho,
                         categoria_id, area_trabajo_id, creado_por, fecha_limite)
     values (('cafede00-0000-4000-8000-' || lpad(v_n::text, 12, '0'))::uuid,
             v_partes[4], v_partes[5], v_partes[3] = '1', null,
-            v_asignado, 'En curso', v_creada, null,
+            v_asignado, 'En curso', v_creada, v_inicio, null,
             v_id_cat, v_id_area, v_creador, v_limite);
   end loop;
 
@@ -227,12 +251,14 @@ begin
       else (now() + make_interval(days => 2 + (i % 14)))::date
     end;
 
+    -- Pendiente = todavía no se toma, así que fecha_inicio queda en null.
+    -- Not picked up yet, so fecha_inicio stays null.
     insert into tareas (id, nombre, detalles, foto_requerida, evidencia_url,
-                        asignado_id, estado, fecha_creacion, fecha_hecho,
+                        asignado_id, estado, fecha_creacion, fecha_inicio, fecha_hecho,
                         categoria_id, area_trabajo_id, creado_por, fecha_limite)
     values (('cafede00-0000-4000-8000-' || lpad(v_n::text, 12, '0'))::uuid,
             v_partes[4], v_partes[5], v_partes[3] = '1', null,
-            v_asignado, 'Pendiente', v_creada, null,
+            v_asignado, 'Pendiente', v_creada, null, null,
             v_id_cat, v_id_area, v_creador, v_limite);
   end loop;
 
@@ -258,6 +284,16 @@ select coalesce(u.nombre_completo, 'Sin asignar') as asignado,
   left join usuarios u on u.id = t.asignado_id
  where t.id::text like 'cafede00-%'
  group by 1 order by total desc;
+
+-- Tiempos medios por persona: es lo que alimenta el reporte de desempeño.
+select u.nombre_completo as asignado,
+       round(avg(extract(epoch from (t.fecha_inicio - t.fecha_creacion)) / 86400)::numeric, 1) as dias_en_tomarla,
+       round(avg(extract(epoch from (t.fecha_hecho  - t.fecha_inicio )) / 86400)::numeric, 1) as dias_en_hacerla,
+       round(avg(extract(epoch from (t.fecha_hecho  - t.fecha_creacion)) / 86400)::numeric, 1) as dias_totales,
+       count(*) as tareas_cerradas
+  from tareas t join usuarios u on u.id = t.asignado_id
+ where t.id::text like 'cafede00-%' and t.estado = 'Hecho'
+ group by 1 order by dias_totales;
 
 select count(*) filter (where foto_requerida and evidencia_url is null and estado = 'En curso')
          as listas_para_demostrar_foto,
