@@ -1,3 +1,44 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Tokens de las gráficas de reportes.
+ * Report chart tokens.
+ *
+ * Los tres colores de estado son los mismos que ya usan las insignias del
+ * Kanban y de las tablas: obligar al lector a reaprender el código de color
+ * entre la tarjeta y el gráfico sería peor que cualquier mejora de paleta.
+ *
+ * Los valores se validaron con el verificador de paletas (banda de luminosidad,
+ * piso de croma, separación bajo daltonismo y contraste contra la superficie).
+ * El amarillo original de la app (#EAB308) NO pasa: queda fuera de la banda de
+ * luminosidad y su contraste sobre blanco es 1.92:1. Por eso Pendiente baja a
+ * ámbar 600.
+ *
+ * El modo oscuro tiene pasos PROPIOS, no una inversión automática: la banda de
+ * luminosidad válida sobre fondo oscuro es distinta, y el juego claro reprueba
+ * ahí.
+ *
+ * Values were run through the palette validator; dark mode has its own steps
+ * rather than an automatic flip, because the valid lightness band differs.
+ */
+@layer base {
+  :root {
+    --viz-superficie: #ffffff;
+    --viz-pendiente: #d97706;
+    --viz-encurso: #2563eb;
+    --viz-hecho: #16a34a;
+    --viz-rejilla: #e5e7eb;
+    --viz-eje: #9ca3af;
+  }
+
+  .dark {
+    --viz-superficie: #1f2937;
+    --viz-pendiente: #c98500;
+    --viz-encurso: #3987e5;
+    --viz-hecho: #16a34a;
+    --viz-rejilla: #374151;
+    --viz-eje: #6b7280;
+  }
+}

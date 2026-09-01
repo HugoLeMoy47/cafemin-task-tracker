@@ -202,7 +202,12 @@ begin
     select id into v_id_area from areas_trabajo where nombre = v_partes[1];
     select id into v_id_cat  from categorias     where nombre = v_partes[2];
 
-    v_creada := now() - make_interval(days => 11 - (i % 11), hours => 3 + (i % 7));
+    -- Repartidas en unas cuatro semanas, no todas en los últimos días: al
+    -- concentrarlas, la gráfica semanal queda plana y luego pega un salto que
+    -- parece un pico de trabajo inexistente.
+    -- Spread over ~4 weeks: concentrating them makes the weekly chart flat and
+    -- then spike, which reads as a workload surge that never happened.
+    v_creada := now() - make_interval(days => 3 + (i * 23) % 26, hours => 3 + (i % 7));
 
     -- Ya está en curso, así que por definición tiene inicio sellado.
     -- It is in progress, so by definition it has a start stamp.
@@ -241,7 +246,7 @@ begin
     select id into v_id_area from areas_trabajo where nombre = v_partes[1];
     select id into v_id_cat  from categorias     where nombre = v_partes[2];
 
-    v_creada := now() - make_interval(days => i % 6, hours => 2 + (i % 5));
+    v_creada := now() - make_interval(days => (i * 7) % 17, hours => 2 + (i % 5));
     v_asignado := case when i % 8 = 3 then null else v_asignados[1 + (i % 3)] end;
     v_creador  := case when i % 3 = 0 then v_admin else v_gestores[1 + (i % 2)] end;
     v_n := v_n + 1;

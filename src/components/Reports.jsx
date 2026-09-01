@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import CollapsibleGroup from './reports/CollapsibleGroup'
 import { construirCsv, descargarCsv, fechaCsv, nombreArchivoCsv } from '../lib/csv'
+import { resumenPorEstado, resumenPorAsignado, serieSemanal } from '../lib/reportes'
+import { GraficaEstado, GraficaAsignado, GraficaSemanal } from './reports/graficas'
 
 const TABS = ['Por Estado', 'Por Asignado', 'Por Fecha']
 
@@ -204,6 +206,7 @@ export default function Reports({ userProfile }) {
       {/* Por Estado */}
       {tab === 'Por Estado' && (
         <div className="space-y-5">
+          <GraficaEstado datos={resumenPorEstado(tasks)} />
           {byEstado.map(({ estado, tasks: group }) => (
             <CollapsibleGroup
               key={estado}
@@ -250,6 +253,7 @@ export default function Reports({ userProfile }) {
       {/* Por Asignado */}
       {tab === 'Por Asignado' && (
         <div className="space-y-5">
+          <GraficaAsignado datos={resumenPorAsignado(tasks)} />
           {byAsignado.map(({ nombre, tasks: group }) => (
             <CollapsibleGroup
               key={nombre}
@@ -291,6 +295,8 @@ export default function Reports({ userProfile }) {
 
       {/* Por Fecha */}
       {tab === 'Por Fecha' && (
+        <>
+        <GraficaSemanal datos={serieSemanal(tasks, 10)} />
         <CollapsibleGroup
           titulo="📅 Todas las tareas por fecha"
           conteo={byFecha.length}
@@ -336,6 +342,7 @@ export default function Reports({ userProfile }) {
           )}
         </div>
         </CollapsibleGroup>
+        </>
       )}
     </div>
   )
