@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, createTransientClient } from '../supabaseClient'
 import { validateEmail, validatePassword, MIN_PASSWORD_LENGTH } from '../utils/validation'
+import { mensajeDeError } from '../lib/errores'
 
 const ROLES = ['Administrador', 'Gestor', 'Asignado']
 
@@ -71,7 +72,7 @@ export default function UserManagement() {
       options: { data: { nombre_completo: form.nombreCompleto.trim() } },
     })
 
-    if (signUpError) { setCreateError(signUpError.message); setCreating(false); return }
+    if (signUpError) { setCreateError(mensajeDeError(signUpError, 'No se pudo crear la cuenta.')); setCreating(false); return }
 
     const userId = data.user?.id
     if (!userId) { setCreateError('No se pudo obtener el ID del nuevo usuario.'); setCreating(false); return }
@@ -80,7 +81,9 @@ export default function UserManagement() {
       const { error: updateError } = await supabase
         .from('usuarios').update({ rol: form.rol }).eq('id', userId)
       if (updateError) {
-        setCreateError(`Usuario creado pero no se pudo asignar el rol: ${updateError.message}`)
+        setCreateError(
+          `La cuenta se creó, pero no se pudo asignar el rol. ${mensajeDeError(updateError, 'Cámbialo desde la lista de usuarios.')}`
+        )
         setCreating(false)
         fetchUsuarios()
         return
@@ -98,7 +101,7 @@ export default function UserManagement() {
     setUpdatingId(userId)
     setError('')
     const { error } = await supabase.from('usuarios').update({ rol: newRol }).eq('id', userId)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo cambiar el rol.'))
     else fetchUsuarios()
     setUpdatingId(null)
   }
@@ -106,7 +109,7 @@ export default function UserManagement() {
   async function deleteUser(userId, nombre) {
     if (!window.confirm(`¿Eliminar el perfil de ${nombre}? Esta acción no elimina la cuenta de autenticación.`)) return
     const { error } = await supabase.from('usuarios').delete().eq('id', userId)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo eliminar el perfil.'))
     else fetchUsuarios()
   }
 

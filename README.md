@@ -187,6 +187,10 @@ npm run format:check  # Verifica formato sin escribir
 
   > Los códigos `PT001`–`PT005` identifican cada regla. `supabase/tests/` ejecuta los cuatro ataques y los cinco controles previos contra un PostgreSQL real en cada corrida.
 - **`search_path` fijo en todas las funciones `SECURITY DEFINER`**: es el hallazgo que el Security Advisor de Supabase marca como *Function Search Path Mutable*. La suite lo verifica sola, así que no depende de acordarse de mirar el panel.
+- **Ningún error crudo llega a pantalla**: `src/lib/errores.js` traduce los fallos de Supabase y Postgres con **lista blanca, no lista negra** — solo sale un texto que escribimos nosotros; lo que no se reconoce se sustituye por un respaldo. Una lista negra falla el día que aparece un mensaje que nadie anticipó, y ese día es justo cuando importa: un fallo de RLS o de índice único trae el nombre de la tabla, de la columna o de la política.
+
+  > El login usa `mensajeDeLogin`, que colapsa **cualquier** distinción entre estados de cuenta —incluido un error inesperado—. Es el único punto donde el servidor responde a alguien que todavía no se identificó, y una diferencia de texto entre «no existe» y «contraseña incorrecta» convierte la pantalla en un detector de correos registrados.
+- **El CSV no ejecuta fórmulas**: un valor que empiece por `=`, `+`, `-` o `@` se antepone con apóstrofo. El entrecomillado de CSV es correcto para el formato pero no impide que Excel evalúe la celda, y este reporte está hecho justamente para abrirse en la computadora de un tercero.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
 
@@ -480,6 +484,8 @@ npm run format:check  # Check formatting without writing
   > ⚠️ `storage_evidencias_privado.sql` must ship **with** the code that signs URLs; running it against an older deployment makes photos unreachable. `toStoragePath()` tolerates the legacy full public URL so pre-migration rows keep opening.
 - **Closing rules live in the database, not the browser**: an Asignado cannot close a task that requires a photo without uploading one, cannot reopen a closed task, and cannot point the evidence at another task or strip it after closing. Before `reglas_cierre_asignado.sql` all three were conventions in `KanbanBoard.jsx` that a direct API call walked past. Admin and Gestor keep both bypasses — a product decision, not an oversight. Codes `PT001`–`PT005` identify each rule; `supabase/tests/` replays the four attacks and the five pre-existing controls against a real PostgreSQL on every run.
 - **`search_path` pinned on every `SECURITY DEFINER` function** — the finding Supabase's Security Advisor reports as *Function Search Path Mutable*. The suite checks it, so it does not depend on remembering to open the dashboard.
+- **No raw error ever reaches the screen**: `src/lib/errores.js` translates Supabase and Postgres failures using an **allowlist, not a denylist** — only text we wrote is shown, anything unrecognized becomes a caller-supplied fallback. A denylist fails on the first message nobody anticipated, which is exactly when it matters. The login screen uses `mensajeDeLogin`, which collapses **every** account-state distinction, unexpected errors included: it is the only place the server answers someone not yet identified.
+- **The CSV cannot execute formulas**: values starting with `=`, `+`, `-` or `@` are prefixed with an apostrophe. CSV quoting is correct for the format but does not stop Excel from evaluating the cell, and this report is built to be opened on someone else's machine.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
 

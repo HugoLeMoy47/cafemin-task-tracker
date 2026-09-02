@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { DEMO_MODE } from '../config'
 import { MIN_PASSWORD_LENGTH } from '../utils/validation'
+import { mensajeDeError, mensajeDeLogin } from '../lib/errores'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -17,7 +18,12 @@ export default function Login() {
     setLoading(true)
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
+    // `mensajeDeLogin` colapsa cualquier distinción entre estados de cuenta.
+    // Es el único punto donde el servidor le responde a alguien que todavía no
+    // se identificó, así que una diferencia de texto entre "no existe" y
+    // "contraseña incorrecta" convierte la pantalla en un detector de correos.
+    // Collapses account-state distinctions: the only anonymous entry point.
+    if (error) setError(mensajeDeLogin(error))
     setLoading(false)
   }
 
@@ -44,7 +50,7 @@ export default function Login() {
 
     // Solo se muestran fallos de transporte (red, límite de envío), nunca si la
     // cuenta existe. Show transport failures only, never account existence.
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo enviar el correo. Intenta de nuevo.'))
     else {
       setMessage(
         'Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña. Revisa también la carpeta de correo no deseado.'
@@ -62,7 +68,7 @@ export default function Login() {
       password,
       options: { data: { nombre_completo: fullName } },
     })
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo crear la cuenta. Intenta de nuevo.'))
     else setMessage('Revisa tu correo para confirmar tu cuenta y luego inicia sesión.')
     setLoading(false)
   }

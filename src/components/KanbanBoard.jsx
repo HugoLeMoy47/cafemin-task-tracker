@@ -11,6 +11,7 @@ import { supabase } from '../supabaseClient'
 import { validateImageFile } from '../utils/validation'
 import { buildEvidencePath } from '../lib/evidencias'
 import EvidenceLink from './EvidenceLink'
+import { mensajeDeError } from '../lib/errores'
 
 const COLUMNS = [
   {
@@ -195,14 +196,14 @@ function PhotoModal({ task, onSuccess, onCancel }) {
     setError('')
     const path = buildEvidencePath(task.id, file.name)
     const { error: uploadErr } = await supabase.storage.from('evidencias').upload(path, file)
-    if (uploadErr) { setError('Error al subir foto: ' + uploadErr.message); setUploading(false); return }
+    if (uploadErr) { setError(mensajeDeError(uploadErr, 'No se pudo subir la foto. Intenta de nuevo.')); setUploading(false); return }
     // Se guarda la RUTA: el bucket es privado y las URLs firmadas caducan.
     // Store the PATH: the bucket is private and signed URLs expire.
     const { error: updateErr } = await supabase
       .from('tareas')
       .update({ estado: 'Hecho', evidencia_url: path })
       .eq('id', task.id)
-    if (updateErr) { setError(updateErr.message); setUploading(false); return }
+    if (updateErr) { setError(mensajeDeError(updateErr, 'No se pudo marcar la tarea como Hecha.')); setUploading(false); return }
     onSuccess()
   }
 
@@ -312,13 +313,13 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   async function handleDelete(task) {
     if (!window.confirm(`¿Eliminar la tarea "${task.nombre}"?`)) return
     const { error } = await supabase.from('tareas').delete().eq('id', task.id)
-    if (error) setDragError(error.message)
+    if (error) setDragError(mensajeDeError(error, 'No se pudo eliminar la tarea.'))
     else fetchTasks()
   }
 
   async function handleReopen(task) {
     const { error } = await supabase.from('tareas').update({ estado: 'En curso' }).eq('id', task.id)
-    if (error) setDragError(error.message)
+    if (error) setDragError(mensajeDeError(error, 'No se pudo reabrir la tarea.'))
     else fetchTasks()
   }
 

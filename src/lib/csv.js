@@ -17,13 +17,43 @@
 export const CSV_SEPARADOR = ';'
 
 /**
- * Escapa un valor. Envuelve en comillas si contiene el separador, comillas o
- * saltos de línea, y duplica las comillas internas (regla estándar de CSV).
- * Escapes a value following the standard CSV quoting rules.
+ * Caracteres con los que Excel, Google Sheets y LibreOffice empiezan a
+ * interpretar una celda como fórmula en vez de como texto.
+ * Characters that make a spreadsheet read a cell as a formula.
+ */
+const INICIOS_DE_FORMULA = ['=', '+', '-', '@', '\t', '\r']
+
+/**
+ * Neutraliza la inyección de fórmulas.
+ *
+ * El entrecomillado de CSV es correcto para el formato pero NO impide que la
+ * hoja de cálculo evalúe la celda: una tarea llamada `=1+1` se abre como una
+ * fórmula, y con las funciones adecuadas eso llega a ser ejecución de comandos
+ * en la máquina de quien abre el archivo. El CSV de este reporte está hecho
+ * justamente para salir a la computadora de un tercero.
+ *
+ * La mitigación estándar es anteponer un apóstrofo: las tres hojas de cálculo
+ * lo consumen y muestran el texto tal cual. Aquí no hay daño colateral porque
+ * ninguna columna exportada es numérica —son nombres, estados y fechas ISO—,
+ * así que no se está "arruinando" un número negativo.
+ *
+ * Quoting is correct for the format but does not stop the spreadsheet from
+ * evaluating the cell. No collateral damage here: no exported column is
+ * numeric, so no negative number gets mangled.
+ */
+export function neutralizarFormula(texto) {
+  return INICIOS_DE_FORMULA.includes(texto[0]) ? `'${texto}` : texto
+}
+
+/**
+ * Escapa un valor. Primero neutraliza fórmulas, luego envuelve en comillas si
+ * contiene el separador, comillas o saltos de línea, duplicando las comillas
+ * internas (regla estándar de CSV).
+ * Escapes a value: formula guard first, then standard CSV quoting.
  */
 export function escaparCampo(valor) {
   if (valor === null || valor === undefined) return ''
-  const texto = String(valor)
+  const texto = neutralizarFormula(String(valor))
   if (texto === '') return ''
   if (
     texto.includes(CSV_SEPARADOR) ||

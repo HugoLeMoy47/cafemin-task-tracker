@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { validateImageFile } from '../utils/validation'
 import { buildEvidencePath } from '../lib/evidencias'
 import EvidenceLink from './EvidenceLink'
+import { mensajeDeError } from '../lib/errores'
 
 const ESTADO_STYLE = {
   Pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700',
@@ -41,7 +42,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
       return
     }
     const { error } = await supabase.from('tareas').update({ estado: newStatus }).eq('id', task.id)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo cambiar el estado de la tarea.'))
     else onRefresh()
   }
 
@@ -55,7 +56,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
     const path = buildEvidencePath(task.id, file.name)
     const { error: uploadErr } = await supabase.storage.from('evidencias').upload(path, file)
     if (uploadErr) {
-      setError('Error al subir foto: ' + uploadErr.message)
+      setError(mensajeDeError(uploadErr, 'No se pudo subir la foto. Intenta de nuevo.'))
       setUploading(false)
       return
     }
@@ -65,7 +66,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
       .from('tareas')
       .update({ estado: 'Hecho', evidencia_url: path })
       .eq('id', task.id)
-    if (updateErr) setError(updateErr.message)
+    if (updateErr) setError(mensajeDeError(updateErr, 'No se pudo marcar la tarea como Hecha.'))
     else { setAwaitingPhoto(false); onRefresh() }
     setUploading(false)
   }
@@ -73,7 +74,7 @@ export default function TaskCard({ task, userProfile, onRefresh, onEdit }) {
   async function handleDelete() {
     if (!window.confirm('¿Eliminar esta tarea?')) return
     const { error } = await supabase.from('tareas').delete().eq('id', task.id)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo eliminar la tarea.'))
     else onRefresh()
   }
 

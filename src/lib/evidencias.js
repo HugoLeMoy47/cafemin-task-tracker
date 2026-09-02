@@ -76,7 +76,13 @@ export async function getSignedEvidenceUrl(valor) {
     .createSignedUrl(path, VIGENCIA_SEGUNDOS)
 
   if (error) {
-    return { url: null, error: `No se pudo abrir la evidencia: ${error.message}` }
+    // El mensaje de Storage puede nombrar el bucket o la política que denegó.
+    // Storage's own message can name the bucket or the policy that denied it.
+    const { mensajeDeError } = await import('./errores')
+    return {
+      url: null,
+      error: mensajeDeError(error, 'No se pudo abrir la evidencia. Intenta de nuevo.'),
+    }
   }
   return { url: data.signedUrl, error: null }
 }

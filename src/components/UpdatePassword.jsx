@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { validatePasswordChange, MIN_PASSWORD_LENGTH } from '../utils/validation'
+import { mensajeDeError } from '../lib/errores'
 
 /**
  * Pantalla para definir una contraseña nueva tras seguir el enlace de
@@ -38,7 +39,7 @@ export default function UpdatePassword({ onListo }) {
     const { error: updateError } = await supabase.auth.updateUser({ password })
 
     if (updateError) {
-      setError(updateError.message)
+      setError(mensajeDeError(updateError, 'No se pudo guardar la contraseña. Intenta de nuevo.'))
       setGuardando(false)
       return
     }

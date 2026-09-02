@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { mensajeDeError } from '../lib/errores'
 
 const inputClass = 'flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
@@ -24,7 +25,7 @@ function CatalogSection({ title, table }) {
     setLoading(true)
     setError('')
     const { error } = await supabase.from(table).insert({ nombre: newName.trim() })
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo agregar. Intenta de nuevo.'))
     else { setNewName(''); fetchItems() }
     setLoading(false)
   }
@@ -34,7 +35,7 @@ function CatalogSection({ title, table }) {
     setLoading(true)
     setError('')
     const { error } = await supabase.from(table).update({ nombre: editName.trim() }).eq('id', id)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo guardar el cambio.'))
     else { setEditingId(null); fetchItems() }
     setLoading(false)
   }
@@ -42,7 +43,7 @@ function CatalogSection({ title, table }) {
   async function deleteItem(id, nombre) {
     if (!window.confirm(`¿Eliminar "${nombre}"?`)) return
     const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) setError(error.message)
+    if (error) setError(mensajeDeError(error, 'No se pudo eliminar.'))
     else fetchItems()
   }
 

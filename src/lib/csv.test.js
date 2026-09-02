@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { construirCsv, escaparCampo, fechaCsv, nombreArchivoCsv, CSV_SEPARADOR } from './csv.js'
+import {
+  construirCsv,
+  escaparCampo,
+  fechaCsv,
+  neutralizarFormula,
+  nombreArchivoCsv,
+  CSV_SEPARADOR,
+} from './csv.js'
 
 /**
  * El CSV lo abre personal administrativo en Excel en español. Un error de
@@ -88,5 +95,53 @@ describe('nombreArchivoCsv', () => {
 
   it('quita los diacríticos / strips diacritics', () => {
     expect(nombreArchivoCsv('Categoría única')).toMatch(/^cafemin_categoria-unica_/)
+  })
+})
+
+/* ---------------------------------------------------------------- */
+/* Inyección de fórmulas                                            */
+/* ---------------------------------------------------------------- */
+
+describe('inyección de fórmulas / formula injection', () => {
+  /**
+   * El CSV de este reporte está hecho para abrirse en la computadora de un
+   * stakeholder. Una celda que empiece por = la evalúa la hoja de cálculo.
+   */
+  it.each([
+    ['=1+1', "'=1+1"],
+    ['=cmd|\' /C calc\'!A0', "'=cmd|' /C calc'!A0"],
+    ['+SUM(A1:A9)', "'+SUM(A1:A9)"],
+    ['-2+3', "'-2+3"],
+    ['@SUM(1)', "'@SUM(1)"],
+    ['\tvalor', "'\tvalor"],
+  ])('neutraliza %s', (entrada, esperado) => {
+    expect(neutralizarFormula(entrada)).toBe(esperado)
+  })
+
+  it('no toca texto normal / leaves ordinary text alone', () => {
+    for (const t of ['Aseo de baños', 'Ñoño', 'Hecho', '2026-09-02', 'Área 3']) {
+      expect(neutralizarFormula(t)).toBe(t)
+    }
+  })
+
+  it('escaparCampo lo aplica antes de entrecomillar / applied before quoting', () => {
+    // Lleva punto y coma, así que además va entrecomillado. El apóstrofo debe
+    // quedar DENTRO de las comillas, no fuera.
+    expect(escaparCampo('=A1;B2')).toBe('"\'=A1;B2"')
+  })
+
+  it('una tarea con nombre malicioso sale neutralizada en el archivo', () => {
+    const csv = construirCsv(
+      [{ clave: 'tarea', titulo: 'Tarea' }],
+      [{ tarea: '=HYPERLINK("http://x.test","clic")' }]
+    )
+    // Lleva comillas, así que la celda va entrecomillada: el apóstrofo queda
+    // DENTRO. Lo que importa es que la hoja no vea un '=' como primer carácter
+    // del contenido de la celda.
+    expect(csv.split('\r\n')[1]).toBe('"\'=HYPERLINK(""http://x.test"",""clic"")"')
+  })
+
+  it('un encabezado también se neutraliza / headers too', () => {
+    expect(construirCsv([{ clave: 'a', titulo: '=mal' }], []).startsWith("'=")).toBe(true)
   })
 })

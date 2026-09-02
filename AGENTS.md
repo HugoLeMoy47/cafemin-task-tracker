@@ -16,6 +16,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 - `src/lib/` — **pure logic: no React, no Supabase import at module level.** Each file has its `.test.js` beside it.
   - `reportes.js` — aggregations, metrics, filtering and sorting for the reports module
   - `enlaceReporte.js` — report state ⇄ URL query string (`leerEnlace`, `escribirEnlace`, `sanearFiltros`)
+  - `errores.js` — `mensajeDeError(error, respaldo)` and `mensajeDeLogin(error)`. **Allowlist**: only text this module defines is ever shown; anything unrecognized becomes the caller's fallback
   - `csv.js` — CSV construction and download (`;` separator + UTF-8 BOM for Spanish Excel)
   - `evidencias.js` — evidence paths and signed URLs; imports the client lazily so the helpers stay testable without credentials
 - `src/components/` — feature components:
@@ -183,13 +184,15 @@ npm run format        # Prettier
 - Client-side role checks in `App.jsx` and `KanbanBoard.jsx` are defense-in-depth only.
 - Validate user input using `src/utils/validation.js` helpers before sending to Supabase.
 - Handle Supabase errors explicitly and surface them to the user — never silently swallow errors. `fetchProfile`, `loadOptions`, and all async handlers must show user-facing messages on failure.
+- **Never render `error.message` directly.** Always `setError(mensajeDeError(error, '<what failed, in this screen's words>'))` from `src/lib/errores.js`. A raw Postgres or Supabase error names the table, column or policy that rejected the write, and the app is on a public URL with shared demo accounts. On the login screen use `mensajeDeLogin`, which is deliberately mute about account state even for errors it does not recognize.
+- Adding a new user-facing message means adding it to `errores.js`, not inlining it — the allowlist only works if it is the single gate.
 - Auth initialization uses `onAuthStateChange` only (no `getSession` — it fires `INITIAL_SESSION` synchronously and avoids a concurrent double-fetch race).
 - For admin operations that call `supabase.auth.signUp`, use a transient client with `persistSession: false` to avoid overwriting the current admin session.
 - Keep credentials in `.env` and out of source code.
 
 ## Notes for future agents
 
-- **A test suite exists**: Vitest, currently 134 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
+- **A test suite exists**: Vitest, currently 171 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`, plus the SQL suite in `supabase/tests/`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
 - Three ESLint warnings are known and deliberate for now (`useEffect` deps in `CatalogManagement.jsx` and `KanbanBoard.jsx`, unused `userProfile` in `Reports.jsx`). Do not add new ones; treat any fourth warning as a regression.
 - Prettier has not been run across the whole repo yet. When it is, it goes in its own commit so it never hides a real change in the diff.
 - `TaskList.jsx` is no longer used in the main navigation flow (all roles now use `KanbanBoard`). It is kept for reference but can be removed if the codebase is cleaned up.
