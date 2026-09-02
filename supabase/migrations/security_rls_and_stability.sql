@@ -30,6 +30,14 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- El trigger ya lo crea schema.sql. Sin este drop, seguir el orden de
+-- instalación documentado en el README aborta aquí con "trigger already
+-- exists" en una base nueva. Lo detectó la suite de supabase/tests/ al
+-- ejecutar los archivos reales en secuencia por primera vez.
+-- schema.sql already creates it; without this drop, a fresh install following
+-- the documented order aborts here.
+drop trigger if exists trg_restrict_asignado_update on tareas;
+
 create trigger trg_restrict_asignado_update
   before update on tareas
   for each row execute function restrict_asignado_update();

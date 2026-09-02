@@ -149,7 +149,7 @@ export default function BarraFiltros({
         <button
           type="button"
           onClick={onCopiarEnlace}
-          title="Copia la dirección de esta vista, con sus filtros y su orden"
+          title="Copia la dirección de esta vista: pestaña, orden y todos los filtros menos el texto de búsqueda"
           className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
         >
           🔗 Copiar enlace de esta vista
@@ -157,6 +157,16 @@ export default function BarraFiltros({
         {avisoEnlace && (
           <span role="status" className="text-xs text-green-700 dark:text-green-400">
             {avisoEnlace}
+          </span>
+        )}
+
+        {/* Solo se avisa cuando hay algo que avisar. Decir siempre que la
+            búsqueda no viaja sería ruido; callarlo justo cuando el usuario
+            acaba de escribir algo sería una sorpresa al pegar el enlace.
+            Shown only when there is something to warn about. */}
+        {filtros.busqueda !== '' && (
+          <span className="text-[11px] text-gray-500 dark:text-gray-400">
+            El enlace no incluye el texto de búsqueda.
           </span>
         )}
 

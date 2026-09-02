@@ -75,9 +75,13 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 5. supabase/migrations/add_fecha_inicio.sql
 6. supabase/migrations/hardening_rls_demo_publica.sql
 7. supabase/migrations/storage_evidencias_privado.sql
+8. supabase/migrations/reglas_cierre_asignado.sql
+9. supabase/migrations/search_path_handle_new_user.sql
 ```
 
 > `add_fecha_inicio.sql` reemplaza el trigger `trg_fecha_hecho` por `trg_marcas_de_tiempo`, que además sella cuándo una tarea entra a *En curso*. Sin esa marca solo se puede medir el tiempo total, que mezcla el tiempo que la tarea pasó esperando con el que costó hacerla.
+
+> Este orden se ejecuta entero en cada corrida de `supabase/tests/`, así que se comprueba solo. Es lo que destapó que `security_rls_and_stability.sql` volvía a crear un trigger que `schema.sql` ya había creado: una instalación nueva abortaba en el paso 4.
 
 
 Después de ejecutar el schema, regístrate en la app con tu correo de administrador y luego ejecuta este SQL para asignarte el rol:
@@ -179,6 +183,10 @@ npm run format:check  # Verifica formato sin escribir
   > El motivo no es formal. En un refugio para personas migrantes, una foto de evidencia puede identificar a alguien en situación de vulnerabilidad; una URL pública permanente la deja legible para cualquiera que la reenvíe.
 
   > ⚠️ `storage_evidencias_privado.sql` **va junto con el código que firma las URLs**. Correr la migración sobre un despliegue viejo deja las fotos inaccesibles. `toStoragePath()` tolera el formato heredado (URL pública completa) para que las filas anteriores a la migración sigan abriendo.
+- **Las reglas de cierre viven en la base, no en el navegador**: un Asignado no puede cerrar una tarea que exige foto sin subirla, no puede reabrir una tarea ya cerrada, y no puede apuntar la evidencia a otra tarea ni quitarla después de cerrar. Antes de `reglas_cierre_asignado.sql` las tres eran convenciones de `KanbanBoard.jsx`, y una llamada directa a la API se las saltaba. Administrador y Gestor conservan la reapertura y el cierre sin foto: es una decisión de producto, no un olvido.
+
+  > Los códigos `PT001`–`PT005` identifican cada regla. `supabase/tests/` ejecuta los cuatro ataques y los cinco controles previos contra un PostgreSQL real en cada corrida.
+- **`search_path` fijo en todas las funciones `SECURITY DEFINER`**: es el hallazgo que el Security Advisor de Supabase marca como *Function Search Path Mutable*. La suite lo verifica sola, así que no depende de acordarse de mirar el panel.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
 
@@ -196,7 +204,9 @@ Cuatro pestañas. **Resumen** llega primero porque quien entra a reportes quiere
 
 **Orden por columna.** Clic en el encabezado. Las fechas arrancan de más nueva a más vieja y el texto de la A a la Z, porque es lo que se busca en cada caso. Los nulos quedan al final en ambas direcciones: una tarea sin cerrar no es «la más antigua». El estado ordena por el flujo (Pendiente → En curso → Hecho), no alfabéticamente. El criterio **no se comparte entre pestañas**: cada una muestra columnas distintas y arrastrarlo dejaría las filas ordenadas por algo que ahí no se ve.
 
-**La vista se comparte por su URL.** Filtros, pestaña y orden viven en la cadena de consulta, así que copiar la dirección basta para que otra persona abra exactamente lo mismo. Hay un botón *Copiar enlace de esta vista* porque, sin él, nadie descubre que la URL cambió.
+**La vista se comparte por su URL.** Periodo, persona, estado, área, categoría, pestaña y orden viven en la cadena de consulta, así que copiar la dirección basta para que otra persona abra exactamente lo mismo. Hay un botón *Copiar enlace de esta vista* porque, sin él, nadie descubre que la URL cambió.
+
+> **La búsqueda por nombre NO viaja en la URL, a propósito.** Todos los demás filtros solo pueden tomar valores que ya existen en los catálogos; la búsqueda es texto libre, y en un refugio para personas migrantes lo que alguien teclee ahí puede ser el nombre de una persona atendida. Una URL se pega en correos, queda en el historial del navegador y sobrevive al motivo por el que se compartió. Cuando hay una búsqueda activa, la barra lo avisa junto al botón de copiar.
 
 - Solo se escribe lo que se aparta del valor por defecto: entrar y no tocar nada deja la URL limpia, y un enlace con parámetros dice de verdad qué se filtró.
 - Se usa `replaceState`, no `pushState`: el buscador dispara un cambio por tecla y con historial el botón «atrás» exigiría una pulsación por letra tecleada.
@@ -364,6 +374,8 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 5. supabase/migrations/add_fecha_inicio.sql
 6. supabase/migrations/hardening_rls_demo_publica.sql
 7. supabase/migrations/storage_evidencias_privado.sql
+8. supabase/migrations/reglas_cierre_asignado.sql
+9. supabase/migrations/search_path_handle_new_user.sql
 ```
 
 > `add_fecha_inicio.sql` replaces the `trg_fecha_hecho` trigger with `trg_marcas_de_tiempo`, which also stamps when a task enters *En curso*. Without that stamp only total time is measurable, which conflates waiting with working.
@@ -466,6 +478,8 @@ npm run format:check  # Check formatting without writing
 - **Private evidence bucket**: `evidencias` is not public. `tareas.evidencia_url` stores the file **path** (`{task_id}/{timestamp}.{ext}`), not a URL, and the client mints a 60-second signed URL with `createSignedUrl()` at open time. SELECT and DELETE policies match the path's first segment against the task's assignee, so an Asignado can only reach evidence for their own tasks. In a shelter for migrants, an evidence photo can identify a vulnerable person — a permanent public URL leaves that readable to anyone it is forwarded to.
 
   > ⚠️ `storage_evidencias_privado.sql` must ship **with** the code that signs URLs; running it against an older deployment makes photos unreachable. `toStoragePath()` tolerates the legacy full public URL so pre-migration rows keep opening.
+- **Closing rules live in the database, not the browser**: an Asignado cannot close a task that requires a photo without uploading one, cannot reopen a closed task, and cannot point the evidence at another task or strip it after closing. Before `reglas_cierre_asignado.sql` all three were conventions in `KanbanBoard.jsx` that a direct API call walked past. Admin and Gestor keep both bypasses — a product decision, not an oversight. Codes `PT001`–`PT005` identify each rule; `supabase/tests/` replays the four attacks and the five pre-existing controls against a real PostgreSQL on every run.
+- **`search_path` pinned on every `SECURITY DEFINER` function** — the finding Supabase's Security Advisor reports as *Function Search Path Mutable*. The suite checks it, so it does not depend on remembering to open the dashboard.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
 
@@ -483,7 +497,9 @@ The summary answers what a listing cannot: how much is closed, how much is overd
 
 **Column sorting.** Dates start newest-first and text A–Z, because that is what each is wanted for. Nulls stay last in both directions — an unfinished task is not "the oldest". Status sorts by flow order (Pendiente → En curso → Hecho), not alphabetically. The criterion is **not shared across tabs**: each shows different columns, and carrying it over would sort rows by something invisible there.
 
-**The view is shared by its URL.** Filters, tab and sort live in the query string, so copying the address is enough for someone else to open the same thing; a *Copiar enlace de esta vista* button makes that discoverable.
+**The view is shared by its URL.** Period, person, status, area, category, tab and sort live in the query string, so copying the address is enough for someone else to open the same thing; a *Copiar enlace de esta vista* button makes that discoverable.
+
+> **The name search deliberately does NOT travel in the URL.** Every other filter can only hold a value that already exists in a catalog; free text can hold the name of a person the shelter is sheltering, and a URL outlives the reason it was shared. The bar says so next to the copy button whenever a search is active.
 
 - Only non-default values are written, so an untouched report keeps a clean URL and a link with parameters really says what was filtered.
 - `replaceState`, not `pushState`: the search box fires per keystroke, and history entries would make Back require one press per letter typed.

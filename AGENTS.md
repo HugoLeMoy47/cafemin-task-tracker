@@ -38,6 +38,9 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   4. `add_fecha_inicio.sql` — adds `fecha_inicio` and replaces `trg_fecha_hecho` with `trg_marcas_de_tiempo`
   5. `hardening_rls_demo_publica.sql` — policy hardening for public exposure
   6. `storage_evidencias_privado.sql` — private bucket + ownership-scoped access
+  7. `reglas_cierre_asignado.sql` — moves the task-closing rules out of the client (see below)
+  8. `search_path_handle_new_user.sql` — pins the last mutable `search_path`
+- `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
 - `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
 
 ## Database schema
@@ -50,7 +53,9 @@ Key behaviors:
 - `get_my_role()` is a security-definer SQL function used in all RLS policies
 - RLS policies enforce: Admin/Gestor see all tasks; Asignado sees only tasks where `asignado_id = auth.uid()`
 - The `"Asignado update own task"` policy has both `USING` and `WITH CHECK` to prevent self-reassignment
-- Trigger `trg_restrict_asignado_update` enforces at DB level that Asignado can only modify `estado` and `evidencia_url`
+- Trigger `trg_restrict_asignado_update` enforces at DB level that Asignado can only modify `estado` and `evidencia_url`, **and since `reglas_cierre_asignado.sql` also enforces the closing rules**: no closing a `foto_requerida` task without evidence (`PT003`), no reopening from `'Hecho'` (`PT002`), evidence must belong to the task (`PT004`), and evidence cannot be stripped from a closed task (`PT005`). Admin and Gestor bypass the first two by design.
+- That function must **never mention the start-stamp column by name**: `add_fecha_inicio.sql` has a guard that inspects `prosrc` and aborts if it appears, because listing it would stop an Asignado from starting a task.
+- It also normalizes blank `evidencia_url` to `null` on write, so `is null` is reliable everywhere else.
 
 ## Storage
 
@@ -163,8 +168,10 @@ npm run format        # Prettier
 - Supabase access lives directly in components; import the client from `src/supabaseClient.js` — **never** `createClient` from `@supabase/supabase-js` (ESLint blocks it).
 - Business logic that can be quietly wrong — averages, time windows, ordering, serialization — goes in `src/lib/` as pure functions with a `.test.js` beside it, not inline in a component. Components render; `lib/` decides.
 - Use helpers from `src/utils/validation.js` for form and file validation — do not inline logic.
-- Schema changes go in `supabase/migrations/` as individual `.sql` files.
+- Schema changes go in `supabase/migrations/` as individual `.sql` files, and the README's ordered list is updated in the same commit — `supabase/tests/00_espejo.sql` executes that order, so a file missing from it is a file nobody tests.
 - Storage bucket changes (policies, new buckets) also go in `supabase/migrations/`.
+- **A change to a policy or trigger ships with its case in `supabase/tests/01_reglas_asignado.sql`** — and, when the change is a new restriction, with the normal-use case it could break. A security rule that gets in the way of daily work gets switched off, and then it protects nothing.
+- Do not put free-text user input into the URL. `src/lib/enlaceReporte.js` deliberately omits the search field: catalog values are bounded, free text is not, and a URL outlives the reason it was shared.
 - When adding realtime subscriptions, always return a cleanup function: `return () => supabase.removeChannel(channel)`.
 - Never name a function `fetch` inside a component — it shadows the browser global. Use descriptive names like `fetchItems`, `fetchTasks`.
 

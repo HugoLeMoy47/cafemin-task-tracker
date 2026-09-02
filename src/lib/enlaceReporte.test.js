@@ -32,12 +32,12 @@ describe('leerEnlace', () => {
 
   it('lee filtros, pestaña y orden / reads filters, tab and sort', () => {
     const r = leerEnlace(
-      '?tab=Por%20Fecha&q=ba%C3%B1os&periodo=30&persona=Beto&estado=Hecho&area=Patio&categoria=Salud&orden=tarea:asc',
+      '?tab=Por%20Fecha&periodo=30&persona=Beto&estado=Hecho&area=Patio&categoria=Salud&orden=tarea:asc',
       OPC
     )
     expect(r.tab).toBe('Por Fecha')
     expect(r.filtros).toEqual({
-      busqueda: 'baños',
+      busqueda: '',
       periodo: '30',
       persona: 'Beto',
       estado: 'Hecho',
@@ -73,6 +73,12 @@ describe('leerEnlace', () => {
       campo: 'tarea',
       direccion: 'asc',
     })
+  })
+
+  it('ignora un q= heredado en un enlace viejo / ignores a stale q= param', () => {
+    const r = leerEnlace('?q=Nombre%20De%20Alguien&persona=Beto', OPC)
+    expect(r.filtros.busqueda).toBe('')
+    expect(r.filtros.persona).toBe('Beto')
   })
 
   it('recorta un valor absurdamente largo / caps an absurdly long value', () => {
@@ -128,7 +134,7 @@ describe('ida y vuelta / round trip', () => {
     const estado = {
       tab: 'Por Asignado',
       filtros: {
-        busqueda: 'poda & riego',
+        busqueda: '',
         periodo: '90',
         persona: 'Lucía Ferrer',
         estado: 'En curso',
@@ -144,11 +150,61 @@ describe('ida y vuelta / round trip', () => {
   it('sobrevive a acentos, espacios y ampersands / survives accents and separators', () => {
     const estado = {
       tab: 'Por Fecha',
-      filtros: { ...FILTRO_VACIO, busqueda: 'baños & niños=sí?' },
+      filtros: { ...FILTRO_VACIO, area: 'Baños & patios', persona: 'Lucía Ferrer' },
       orden: ORDEN_INICIAL['Por Fecha'],
     }
     const vuelta = leerEnlace(`?${escribirEnlace(estado, OPC)}`, OPC)
-    expect(vuelta.filtros.busqueda).toBe('baños & niños=sí?')
+    expect(vuelta.filtros.area).toBe('Baños & patios')
+    expect(vuelta.filtros.persona).toBe('Lucía Ferrer')
+  })
+})
+
+/* ---------------------------------------------------------------- */
+/* La búsqueda libre no sale a la URL                                */
+/* ---------------------------------------------------------------- */
+
+describe('la búsqueda libre nunca viaja / free-text search never travels', () => {
+  /**
+   * Es el único filtro que puede contener texto que nadie eligió de un catálogo,
+   * y por tanto el único donde puede aterrizar el nombre de una persona atendida.
+   * Estas pruebas están para que un cambio futuro no lo devuelva a la URL sin que
+   * alguien lo note.
+   */
+  it('no se emite aunque esté puesta / is not emitted even when set', () => {
+    const q = escribirEnlace(
+      {
+        tab: 'Por Fecha',
+        filtros: { ...FILTRO_VACIO, busqueda: 'Nombre De Alguien' },
+        orden: ORDEN_INICIAL['Por Fecha'],
+      },
+      OPC
+    )
+    expect(q).toBe('tab=Por+Fecha')
+    expect(q).not.toContain('Nombre')
+    expect(q).not.toContain('q=')
+  })
+
+  it('una búsqueda sola no genera ningún parámetro / search alone yields no query', () => {
+    expect(
+      escribirEnlace(
+        { tab: 'Resumen', filtros: { ...FILTRO_VACIO, busqueda: 'algo' }, orden: null },
+        OPC
+      )
+    ).toBe('')
+  })
+
+  it('ningún parámetro emitido lleva el texto buscado / no param carries the term', () => {
+    const q = escribirEnlace(
+      {
+        tab: 'Por Estado',
+        filtros: { ...FILTRO_VACIO, busqueda: 'secreto', persona: 'Beto', area: 'Patio' },
+        orden: ORDEN_INICIAL['Por Estado'],
+      },
+      OPC
+    )
+    for (const [, valor] of new URLSearchParams(q)) {
+      expect(valor).not.toContain('secreto')
+    }
   })
 })
 

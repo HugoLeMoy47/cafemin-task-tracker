@@ -26,9 +26,22 @@ export const PERIODOS = ['todo', '30', '90']
  */
 const MAX_VALOR = 120
 
-/** Nombre del parámetro por cada campo del filtro. */
+/**
+ * Nombre del parámetro por cada campo del filtro.
+ *
+ * `busqueda` NO está aquí, y es deliberado. Los demás filtros solo pueden tomar
+ * valores que ya existen en los catálogos; la búsqueda es texto libre, y en un
+ * refugio para personas migrantes lo que alguien teclea ahí puede ser el nombre
+ * de una persona atendida. Una URL se pega en correos, queda en el historial del
+ * navegador y sobrevive al motivo por el que se compartió. El resto de la vista
+ * —periodo, persona, estado, área, categoría, pestaña y orden— sí viaja, que es
+ * lo que hace útil compartir el enlace.
+ *
+ * `busqueda` is deliberately absent. Every other filter can only hold a value
+ * that already exists in a catalog; free text can hold the name of a person the
+ * shelter is sheltering, and a URL outlives the reason it was shared.
+ */
 const PARAM = {
-  busqueda: 'q',
   periodo: 'periodo',
   persona: 'persona',
   estado: 'estado',
@@ -62,8 +75,10 @@ export function leerEnlace(cadena, { tabs, tabPorDefecto, ordenInicial }) {
   const estado = p.get(PARAM.estado)
 
   const filtros = {
+    // `busqueda` se queda en su valor vacío: no se escribe a la URL, así que
+    // tampoco se lee de ella. Un enlace viejo que traiga `q=` se ignora.
+    // Not written to the URL, so not read from it: a stale `q=` is ignored.
     ...FILTRO_VACIO,
-    busqueda: recortar(p.get(PARAM.busqueda) || ''),
     periodo: PERIODOS.includes(periodo) ? periodo : FILTRO_VACIO.periodo,
     persona: recortar(p.get(PARAM.persona) || ''),
     estado: ESTADOS.includes(estado) ? estado : '',
