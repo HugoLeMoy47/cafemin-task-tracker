@@ -12,6 +12,12 @@ import {
   metricasPorPersona,
   tareasRecurrentes,
   cargaPorDimension,
+  FILTRO_VACIO,
+  hayFiltrosActivos,
+  normalizar,
+  opcionesDeFiltro,
+  aplicarFiltros,
+  ordenarTareas,
 } from './reportes.js'
 
 const tarea = (over = {}) => ({
@@ -386,5 +392,185 @@ describe('cargaPorDimension', () => {
   it('agrupa lo que no trae dimensión / groups missing dimension', () => {
     const r = cargaPorDimension([{ estado: 'Hecho', area: null }], 'area')
     expect(r[0].nombre).toBe('Sin asignar')
+  })
+})
+
+/* ---------------------------------------------------------------- */
+/* Filtrado                                                          */
+/* ---------------------------------------------------------------- */
+
+const T = (over = {}) => ({
+  nombre: 'Tarea',
+  estado: 'Pendiente',
+  asignado: null,
+  categoria: null,
+  area: null,
+  fecha_creacion: iso('2026-09-01T00:00:00Z'),
+  fecha_inicio: null,
+  fecha_hecho: null,
+  fecha_limite: null,
+  ...over,
+})
+
+describe('normalizar', () => {
+  it('quita acentos y baja a minúsculas / strips accents and lowercases', () => {
+    expect(normalizar('Baños')).toBe('banos')
+    expect(normalizar('EDUCACIÓN')).toBe('educacion')
+  })
+
+  it('tolera nulos / tolerates nulls', () => {
+    expect(normalizar(null)).toBe('')
+    expect(normalizar(undefined)).toBe('')
+  })
+})
+
+describe('hayFiltrosActivos', () => {
+  it('el filtro vacío no está activo / the empty filter is inactive', () => {
+    expect(hayFiltrosActivos(FILTRO_VACIO)).toBe(false)
+  })
+
+  it('detecta cualquier filtro puesto / detects any set filter', () => {
+    expect(hayFiltrosActivos({ ...FILTRO_VACIO, estado: 'Hecho' })).toBe(true)
+    expect(hayFiltrosActivos({ ...FILTRO_VACIO, periodo: '30' })).toBe(true)
+    expect(hayFiltrosActivos({ ...FILTRO_VACIO, busqueda: '  ' })).toBe(false)
+    expect(hayFiltrosActivos({ ...FILTRO_VACIO, busqueda: ' aseo ' })).toBe(true)
+  })
+})
+
+describe('opcionesDeFiltro', () => {
+  it('deduplica y ordena en español / dedupes and sorts in Spanish', () => {
+    const o = opcionesDeFiltro([
+      T({ asignado: { nombre_completo: 'Zoe' }, area: { nombre: 'Baños' } }),
+      T({ asignado: { nombre_completo: 'Ana' }, area: { nombre: 'Almacén' } }),
+      T({ asignado: { nombre_completo: 'Ana' }, area: { nombre: 'Baños' } }),
+    ])
+    expect(o.personas).toEqual(['Ana', 'Zoe'])
+    expect(o.areas).toEqual(['Almacén', 'Baños'])
+  })
+
+  it('omite los vacíos / skips empties', () => {
+    expect(opcionesDeFiltro([T()]).personas).toEqual([])
+  })
+})
+
+describe('aplicarFiltros', () => {
+  const AHORA = new Date(2026, 8, 10, 12, 0)
+  const datos = [
+    T({ nombre: 'Aseo de baños', estado: 'Hecho', asignado: { nombre_completo: 'Ana' },
+        area: { nombre: 'Baños' }, categoria: { nombre: 'Limpieza' },
+        fecha_creacion: new Date(2026, 8, 9).toISOString() }),
+    T({ nombre: 'Poda del patio', estado: 'Pendiente', asignado: { nombre_completo: 'Beto' },
+        area: { nombre: 'Patio' }, categoria: { nombre: 'Mantenimiento' },
+        fecha_creacion: new Date(2026, 6, 1).toISOString() }),
+    T({ nombre: 'Revisión médica', estado: 'En curso', asignado: null,
+        area: { nombre: 'Enfermería' }, categoria: { nombre: 'Salud' },
+        fecha_creacion: new Date(2026, 8, 1).toISOString() }),
+  ]
+
+  it('sin filtros devuelve todo / returns everything when empty', () => {
+    expect(aplicarFiltros(datos, FILTRO_VACIO, AHORA)).toHaveLength(3)
+  })
+
+  it('busca sin exigir acentos / searches without requiring accents', () => {
+    const r = aplicarFiltros(datos, { ...FILTRO_VACIO, busqueda: 'banos' }, AHORA)
+    expect(r.map((t) => t.nombre)).toEqual(['Aseo de baños'])
+  })
+
+  it('la búsqueda no distingue mayúsculas / search is case-insensitive', () => {
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, busqueda: 'PODA' }, AHORA)).toHaveLength(1)
+  })
+
+  it('filtra por estado, persona, área y categoría', () => {
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, estado: 'Hecho' }, AHORA)).toHaveLength(1)
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, persona: 'Beto' }, AHORA)).toHaveLength(1)
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, area: 'Patio' }, AHORA)).toHaveLength(1)
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, categoria: 'Salud' }, AHORA)).toHaveLength(1)
+  })
+
+  it('permite filtrar las tareas sin asignar / can filter unassigned', () => {
+    const r = aplicarFiltros(datos, { ...FILTRO_VACIO, persona: 'Sin asignar' }, AHORA)
+    expect(r.map((t) => t.nombre)).toEqual(['Revisión médica'])
+  })
+
+  it('el periodo corta por fecha de creación / period cuts by creation date', () => {
+    // Referencia: 10 de septiembre. Corte de 30 días = 11 de agosto; el de 90
+    // días = 12 de junio. La tarea del 1 de julio cae fuera del primero y
+    // dentro del segundo.
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, periodo: '30' }, AHORA)).toHaveLength(2)
+    expect(aplicarFiltros(datos, { ...FILTRO_VACIO, periodo: '90' }, AHORA)).toHaveLength(3)
+  })
+
+  it('deja fuera lo anterior a la ventana / excludes anything before the window', () => {
+    const vieja = [T({ fecha_creacion: new Date(2025, 0, 1).toISOString() })]
+    expect(aplicarFiltros(vieja, { ...FILTRO_VACIO, periodo: '90' }, AHORA)).toHaveLength(0)
+    expect(aplicarFiltros(vieja, FILTRO_VACIO, AHORA)).toHaveLength(1)
+  })
+
+  it('los filtros se combinan con Y, no con O / filters AND together', () => {
+    const r = aplicarFiltros(datos, { ...FILTRO_VACIO, estado: 'Hecho', area: 'Patio' }, AHORA)
+    expect(r).toHaveLength(0)
+  })
+})
+
+/* ---------------------------------------------------------------- */
+/* Ordenamiento                                                      */
+/* ---------------------------------------------------------------- */
+
+describe('ordenarTareas', () => {
+  it('ordena texto en español / sorts text with Spanish collation', () => {
+    const r = ordenarTareas([T({ nombre: 'Ñoño' }), T({ nombre: 'Ana' }), T({ nombre: 'Zoe' })], 'tarea')
+    expect(r.map((t) => t.nombre)).toEqual(['Ana', 'Ñoño', 'Zoe'])
+  })
+
+  it('invierte con desc / reverses on desc', () => {
+    const r = ordenarTareas([T({ nombre: 'Ana' }), T({ nombre: 'Zoe' })], 'tarea', 'desc')
+    expect(r.map((t) => t.nombre)).toEqual(['Zoe', 'Ana'])
+  })
+
+  it('el estado sigue el flujo, no el alfabeto / state follows flow order', () => {
+    const r = ordenarTareas(
+      [T({ nombre: 'c', estado: 'Hecho' }), T({ nombre: 'a', estado: 'Pendiente' }), T({ nombre: 'b', estado: 'En curso' })],
+      'estado'
+    )
+    expect(r.map((t) => t.estado)).toEqual(['Pendiente', 'En curso', 'Hecho'])
+  })
+
+  it('ordena fechas de la más vieja a la más nueva / sorts dates oldest first', () => {
+    const r = ordenarTareas(
+      [
+        T({ nombre: 'b', fecha_creacion: iso('2026-09-05T00:00:00Z') }),
+        T({ nombre: 'a', fecha_creacion: iso('2026-09-01T00:00:00Z') }),
+      ],
+      'creada'
+    )
+    expect(r.map((t) => t.nombre)).toEqual(['a', 'b'])
+  })
+
+  it('los vacíos van al final en AMBAS direcciones / empties last both ways', () => {
+    const datos = [
+      T({ nombre: 'sin fecha', fecha_hecho: null }),
+      T({ nombre: 'con fecha', fecha_hecho: iso('2026-09-01T00:00:00Z') }),
+    ]
+    expect(ordenarTareas(datos, 'hecha', 'asc').map((t) => t.nombre)).toEqual(['con fecha', 'sin fecha'])
+    expect(ordenarTareas(datos, 'hecha', 'desc').map((t) => t.nombre)).toEqual(['con fecha', 'sin fecha'])
+  })
+
+  it('no muta el arreglo original / does not mutate the input', () => {
+    const datos = [T({ nombre: 'b' }), T({ nombre: 'a' })]
+    ordenarTareas(datos, 'tarea')
+    expect(datos.map((t) => t.nombre)).toEqual(['b', 'a'])
+  })
+
+  it('un campo desconocido devuelve una copia sin reordenar', () => {
+    const datos = [T({ nombre: 'b' }), T({ nombre: 'a' })]
+    expect(ordenarTareas(datos, 'inexistente').map((t) => t.nombre)).toEqual(['b', 'a'])
+  })
+
+  it('desempata por nombre para que el orden sea estable', () => {
+    const r = ordenarTareas(
+      [T({ nombre: 'Zeta', estado: 'Hecho' }), T({ nombre: 'Alfa', estado: 'Hecho' })],
+      'estado'
+    )
+    expect(r.map((t) => t.nombre)).toEqual(['Alfa', 'Zeta'])
   })
 })

@@ -287,3 +287,149 @@ export function cargaPorDimension(tareas, dimension) {
     (a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es')
   )
 }
+
+/* ==================================================================== */
+/* Filtrado y ordenamiento                                              */
+/*                                                                      */
+/* Una sola barra de filtros gobierna TODO: el resumen, las tres        */
+/* pestañas y la exportación. Las pestañas dejan de ser filtros y son   */
+/* lo que siempre fueron en realidad: formas de agrupar el mismo        */
+/* conjunto. Sin esa regla, el botón de exportar mentiría —descargaría  */
+/* 90 filas mientras la pantalla muestra 12—.                           */
+/*                                                                      */
+/* One filter bar governs EVERYTHING: overview, tabs and export. The    */
+/* tabs are groupings, not filters. Without that rule the export button */
+/* would lie.                                                           */
+/* ==================================================================== */
+
+export const FILTRO_VACIO = {
+  busqueda: '',
+  periodo: 'todo', // 'todo' | '30' | '90'
+  persona: '',
+  estado: '',
+  area: '',
+  categoria: '',
+}
+
+export function hayFiltrosActivos(f) {
+  return (
+    f.busqueda.trim() !== '' ||
+    f.periodo !== 'todo' ||
+    f.persona !== '' ||
+    f.estado !== '' ||
+    f.area !== '' ||
+    f.categoria !== ''
+  )
+}
+
+/**
+ * Quita acentos y pasa a minúsculas.
+ * En español buscar "bano" tiene que encontrar "Baños": exigir el acento
+ * convierte el buscador en un examen de ortografía.
+ * Searching "bano" must find "Baños"; requiring the accent turns the search
+ * box into a spelling test.
+ */
+export function normalizar(texto) {
+  return String(texto ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+/** Opciones de los desplegables, derivadas de los datos que hay. */
+export function opcionesDeFiltro(tareas) {
+  const unico = (valores) =>
+    [...new Set(valores.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
+  return {
+    personas: unico(tareas.map((t) => t.asignado?.nombre_completo)),
+    areas: unico(tareas.map((t) => t.area?.nombre)),
+    categorias: unico(tareas.map((t) => t.categoria?.nombre)),
+  }
+}
+
+export function aplicarFiltros(tareas, filtros, ahora = new Date()) {
+  const q = normalizar(filtros.busqueda).trim()
+  const dias = filtros.periodo === 'todo' ? null : Number(filtros.periodo)
+
+  let desde = null
+  if (dias) {
+    desde = new Date(ahora)
+    desde.setDate(desde.getDate() - dias)
+    desde.setHours(0, 0, 0, 0)
+  }
+
+  return tareas.filter((t) => {
+    if (q && !normalizar(t.nombre).includes(q)) return false
+    if (filtros.estado && t.estado !== filtros.estado) return false
+    if (filtros.persona && (t.asignado?.nombre_completo || SIN_ASIGNAR) !== filtros.persona)
+      return false
+    if (filtros.area && t.area?.nombre !== filtros.area) return false
+    if (filtros.categoria && t.categoria?.nombre !== filtros.categoria) return false
+    if (desde) {
+      const creada = new Date(t.fecha_creacion)
+      if (Number.isNaN(creada.getTime()) || creada < desde) return false
+    }
+    return true
+  })
+}
+
+/* -------------------------------------------------------------------- */
+/* Ordenamiento                                                          */
+/* -------------------------------------------------------------------- */
+
+/** Campos ordenables y cómo se extrae su valor comparable. */
+export const CAMPOS_ORDEN = {
+  tarea: { tipo: 'texto', valor: (t) => t.nombre },
+  estado: { tipo: 'estado', valor: (t) => t.estado },
+  asignado: { tipo: 'texto', valor: (t) => t.asignado?.nombre_completo || null },
+  categoria: { tipo: 'texto', valor: (t) => t.categoria?.nombre || null },
+  area: { tipo: 'texto', valor: (t) => t.area?.nombre || null },
+  creada: { tipo: 'fecha', valor: (t) => t.fecha_creacion },
+  limite: { tipo: 'fecha', valor: (t) => t.fecha_limite },
+  hecha: { tipo: 'fecha', valor: (t) => t.fecha_hecho },
+}
+
+function comparable(valor, tipo) {
+  if (valor === null || valor === undefined || valor === '') return null
+  if (tipo === 'fecha') {
+    const ms = new Date(valor).getTime()
+    return Number.isNaN(ms) ? null : ms
+  }
+  if (tipo === 'estado') {
+    const i = ESTADOS.indexOf(valor)
+    return i === -1 ? null : i
+  }
+  return String(valor)
+}
+
+/**
+ * Ordena sin mutar el arreglo original.
+ *
+ * Los vacíos van SIEMPRE al final, en ambas direcciones. Un valor ausente no
+ * es "el más pequeño": es que no existe, y arrastrarlo al principio al invertir
+ * el orden esconde las filas que sí tienen dato.
+ * Empty values always sort last, in BOTH directions: a missing value is not
+ * "smallest", it is absent.
+ *
+ * El estado se ordena por el flujo (Pendiente, En curso, Hecho), no
+ * alfabéticamente, que daría "En curso, Hecho, Pendiente" y no significa nada.
+ * State sorts by flow order, not alphabetically.
+ */
+export function ordenarTareas(tareas, campo, direccion = 'asc') {
+  const def = CAMPOS_ORDEN[campo]
+  if (!def) return [...tareas]
+  const signo = direccion === 'desc' ? -1 : 1
+
+  return [...tareas].sort((a, b) => {
+    const va = comparable(def.valor(a), def.tipo)
+    const vb = comparable(def.valor(b), def.tipo)
+
+    if (va === null && vb === null) return 0
+    if (va === null) return 1
+    if (vb === null) return -1
+
+    const cmp = def.tipo === 'texto' ? va.localeCompare(vb, 'es') : va - vb
+    // Desempate estable por nombre, para que dos recargas den el mismo orden.
+    return cmp !== 0 ? cmp * signo : String(a.nombre).localeCompare(String(b.nombre), 'es')
+  })
+}

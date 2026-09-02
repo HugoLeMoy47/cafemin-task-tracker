@@ -2,7 +2,19 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import CollapsibleGroup from './reports/CollapsibleGroup'
 import { construirCsv, descargarCsv, fechaCsv, nombreArchivoCsv } from '../lib/csv'
-import { resumenPorEstado, resumenPorAsignado, serieSemanal } from '../lib/reportes'
+import {
+  resumenPorEstado,
+  resumenPorAsignado,
+  serieSemanal,
+  aplicarFiltros,
+  opcionesDeFiltro,
+  ordenarTareas,
+  hayFiltrosActivos,
+  FILTRO_VACIO,
+  CAMPOS_ORDEN,
+} from '../lib/reportes'
+import BarraFiltros from './reports/BarraFiltros'
+import EncabezadoOrdenable from './reports/EncabezadoOrdenable'
 import { GraficaEstado, GraficaAsignado, GraficaSemanal } from './reports/graficas'
 import Dashboard from './reports/Dashboard'
 
@@ -58,7 +70,27 @@ function filaCsv(t, grupo) {
   }
 }
 
-const thClass = 'text-left px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400'
+/**
+ * Orden inicial de cada pestaña. Las de fecha arrancan de lo más nuevo a lo
+ * más viejo, que es lo que se busca al abrir un reporte.
+ * Date columns start newest-first, which is what a report reader wants.
+ */
+const ORDEN_INICIAL = {
+  'Por Estado': { campo: 'creada', direccion: 'desc' },
+  'Por Asignado': { campo: 'tarea', direccion: 'asc' },
+  'Por Fecha': { campo: 'creada', direccion: 'desc' },
+}
+
+/**
+ * Primer clic en una columna: las fechas bajan de más nueva a más vieja; el
+ * texto y el estado suben. Forzar 'asc' en una fecha obliga a un segundo clic
+ * para ver lo reciente, que es lo que casi siempre se quiere.
+ * First click: dates go newest-first, text and state ascending.
+ */
+function direccionInicial(campo) {
+  return CAMPOS_ORDEN[campo]?.tipo === 'fecha' ? 'desc' : 'asc'
+}
+
 const tdBase = 'px-4 py-2.5'
 
 export default function Reports({ userProfile }) {
@@ -74,6 +106,18 @@ export default function Reports({ userProfile }) {
    * counts, which are the summary the reader came for.
    */
   const [abiertos, setAbiertos] = useState(() => new Set())
+
+  /** Filtro global: gobierna el resumen, las tres pestañas y la exportación. */
+  const [filtros, setFiltros] = useState(FILTRO_VACIO)
+
+  /**
+   * Orden por pestaña, no compartido. Cada pestaña muestra columnas distintas;
+   * arrastrar el criterio de una a otra dejaría las filas ordenadas por algo
+   * que ahí no se ve.
+   * Per-tab sort: carrying one tab's criterion into another would order rows by
+   * something that tab does not display.
+   */
+  const [ordenes, setOrdenes] = useState(ORDEN_INICIAL)
 
   const estaAbierto = (clave) => abiertos.has(clave)
   const alternar = (clave) =>
@@ -113,13 +157,34 @@ export default function Reports({ userProfile }) {
     </div>
   )
 
+  const orden = ordenes[tab] ?? ORDEN_INICIAL['Por Fecha']
+
+  function alternarOrden(campo) {
+    setOrdenes((prev) => {
+      const actual = prev[tab]
+      const direccion =
+        actual?.campo === campo
+          ? actual.direccion === 'asc'
+            ? 'desc'
+            : 'asc'
+          : direccionInicial(campo)
+      return { ...prev, [tab]: { campo, direccion } }
+    })
+  }
+
+  // Todo lo que se muestra abajo parte de aquí. Una sola fuente filtrada evita
+  // que el resumen diga 90 y la tabla 12.
+  const filtradas = aplicarFiltros(tasks, filtros)
+  const ordenadas = ordenarTareas(filtradas, orden.campo, orden.direccion)
+  const opciones = opcionesDeFiltro(tasks)
+
   const byEstado = ['Pendiente', 'En curso', 'Hecho'].map((estado) => ({
     estado,
-    tasks: tasks.filter((t) => t.estado === estado),
+    tasks: ordenadas.filter((t) => t.estado === estado),
   }))
 
   const byAsignado = Object.values(
-    tasks.reduce((acc, t) => {
+    ordenadas.reduce((acc, t) => {
       const key = t.asignado?.nombre_completo || 'Sin asignar'
       if (!acc[key]) acc[key] = { nombre: key, tasks: [] }
       acc[key].tasks.push(t)
@@ -127,7 +192,7 @@ export default function Reports({ userProfile }) {
     }, {})
   ).sort((a, b) => a.nombre.localeCompare(b.nombre))
 
-  const byFecha = [...tasks]
+  const byFecha = ordenadas
 
   // Claves de los grupos de la pestaña activa. Sirven para "expandir todo" y
   // para saber si ya está todo abierto.
@@ -196,8 +261,31 @@ export default function Reports({ userProfile }) {
         </div>
       </div>
 
+      <BarraFiltros
+        filtros={filtros}
+        onCambiar={setFiltros}
+        opciones={opciones}
+        mostradas={filtradas.length}
+        total={tasks.length}
+      />
+
+      {filtradas.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Ninguna tarea coincide con los filtros.
+          </p>
+          <button
+            type="button"
+            onClick={() => setFiltros(FILTRO_VACIO)}
+            className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      ) : (
+      <>
       {/* Resumen general */}
-      {tab === 'Resumen' && <Dashboard tareas={tasks} />}
+      {tab === 'Resumen' && <Dashboard tareas={filtradas} />}
 
       {/* Acciones de la pestaña. El resumen no agrupa filas ni lista tareas,
           así que ni colapsar ni exportar aplican ahí. */}
@@ -206,11 +294,13 @@ export default function Reports({ userProfile }) {
         <button type="button" onClick={alternarTodo} className={btnBarra}>
           {todoAbierto ? 'Colapsar todo' : 'Expandir todo'}
         </button>
-        <button type="button" onClick={exportar} disabled={tasks.length === 0} className={btnBarra}>
+        <button type="button" onClick={exportar} disabled={filtradas.length === 0} className={btnBarra}>
           ⬇ Exportar CSV
         </button>
         <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
-          {tasks.length} tarea{tasks.length !== 1 ? 's' : ''} en total
+          {hayFiltrosActivos(filtros)
+            ? `${filtradas.length} de ${tasks.length} tareas`
+            : `${tasks.length} tarea${tasks.length !== 1 ? 's' : ''} en total`}
         </span>
       </div>
       )}
@@ -218,7 +308,7 @@ export default function Reports({ userProfile }) {
       {/* Por Estado */}
       {tab === 'Por Estado' && (
         <div className="space-y-5">
-          <GraficaEstado datos={resumenPorEstado(tasks)} />
+          <GraficaEstado datos={resumenPorEstado(filtradas)} />
           {byEstado.map(({ estado, tasks: group }) => (
             <CollapsibleGroup
               key={estado}
@@ -237,10 +327,10 @@ export default function Reports({ userProfile }) {
                     <table className={tableClass}>
                       <thead className={theadClass}>
                         <tr>
-                          <th className={thClass}>Tarea</th>
-                          <th className={thClass}>Asignado</th>
-                          <th className={thClass}>Categoría</th>
-                          <th className={thClass}>Creada</th>
+                          <EncabezadoOrdenable campo="tarea" etiqueta="Tarea" orden={orden} onOrdenar={alternarOrden} />
+                          <EncabezadoOrdenable campo="asignado" etiqueta="Asignado" orden={orden} onOrdenar={alternarOrden} />
+                          <EncabezadoOrdenable campo="categoria" etiqueta="Categoría" orden={orden} onOrdenar={alternarOrden} />
+                          <EncabezadoOrdenable campo="creada" etiqueta="Creada" orden={orden} onOrdenar={alternarOrden} />
                         </tr>
                       </thead>
                       <tbody className={tbodyClass}>
@@ -265,7 +355,7 @@ export default function Reports({ userProfile }) {
       {/* Por Asignado */}
       {tab === 'Por Asignado' && (
         <div className="space-y-5">
-          <GraficaAsignado datos={resumenPorAsignado(tasks)} />
+          <GraficaAsignado datos={resumenPorAsignado(filtradas)} />
           {byAsignado.map(({ nombre, tasks: group }) => (
             <CollapsibleGroup
               key={nombre}
@@ -279,10 +369,10 @@ export default function Reports({ userProfile }) {
                   <table className={tableClass}>
                     <thead className={theadClass}>
                       <tr>
-                        <th className={thClass}>Tarea</th>
-                        <th className={thClass}>Estado</th>
-                        <th className={thClass}>Área</th>
-                        <th className={thClass}>Fecha hecho</th>
+                        <EncabezadoOrdenable campo="tarea" etiqueta="Tarea" orden={orden} onOrdenar={alternarOrden} />
+                        <EncabezadoOrdenable campo="estado" etiqueta="Estado" orden={orden} onOrdenar={alternarOrden} />
+                        <EncabezadoOrdenable campo="area" etiqueta="Área" orden={orden} onOrdenar={alternarOrden} />
+                        <EncabezadoOrdenable campo="hecha" etiqueta="Fecha hecho" orden={orden} onOrdenar={alternarOrden} />
                       </tr>
                     </thead>
                     <tbody className={tbodyClass}>
@@ -308,7 +398,7 @@ export default function Reports({ userProfile }) {
       {/* Por Fecha */}
       {tab === 'Por Fecha' && (
         <>
-        <GraficaSemanal datos={serieSemanal(tasks, 10)} />
+        <GraficaSemanal datos={serieSemanal(filtradas, 10)} />
         <CollapsibleGroup
           titulo="📅 Todas las tareas por fecha"
           conteo={byFecha.length}
@@ -320,12 +410,12 @@ export default function Reports({ userProfile }) {
             <table className={tableClass}>
               <thead className={theadClass}>
                 <tr>
-                  <th className={thClass}>Tarea</th>
-                  <th className={thClass}>Estado</th>
-                  <th className={thClass}>Asignado</th>
-                  <th className={thClass}>Creada</th>
-                  <th className={thClass}>Límite</th>
-                  <th className={thClass}>Hecho</th>
+                  <EncabezadoOrdenable campo="tarea" etiqueta="Tarea" orden={orden} onOrdenar={alternarOrden} />
+                  <EncabezadoOrdenable campo="estado" etiqueta="Estado" orden={orden} onOrdenar={alternarOrden} />
+                  <EncabezadoOrdenable campo="asignado" etiqueta="Asignado" orden={orden} onOrdenar={alternarOrden} />
+                  <EncabezadoOrdenable campo="creada" etiqueta="Creada" orden={orden} onOrdenar={alternarOrden} />
+                  <EncabezadoOrdenable campo="limite" etiqueta="Límite" orden={orden} onOrdenar={alternarOrden} />
+                  <EncabezadoOrdenable campo="hecha" etiqueta="Hecho" orden={orden} onOrdenar={alternarOrden} />
                 </tr>
               </thead>
               <tbody className={tbodyClass}>
@@ -355,6 +445,8 @@ export default function Reports({ userProfile }) {
         </div>
         </CollapsibleGroup>
         </>
+      )}
+      </>
       )}
     </div>
   )
