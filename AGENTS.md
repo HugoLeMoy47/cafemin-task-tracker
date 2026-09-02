@@ -10,28 +10,42 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 - `vite.config.js` — Vite config for React
 - `src/main.jsx` — app bootstrap
 - `src/App.jsx` — main shell; handles session, profile fetch, and role-guarded state-based routing
-- `src/supabaseClient.js` — Supabase client factory using environment variables (anon key only)
+- `src/supabaseClient.js` — **the only module that reads the Supabase env vars.** Exports the shared `supabase` client and `createTransientClient()`. Accepts `VITE_SUPABASE_PUBLISHABLE_KEY` (preferred) or the legacy `VITE_SUPABASE_ANON_KEY`. An ESLint `no-restricted-imports` rule blocks importing `@supabase/supabase-js` anywhere else — a second module-level `createClient` reading a stale variable name is exactly how the app once shipped broken.
+- `src/config.js` — environment flags (`VITE_DEMO_MODE`)
 - `src/utils/validation.js` — shared validation helpers: email, password, task payload, image file
+- `src/lib/` — **pure logic: no React, no Supabase import at module level.** Each file has its `.test.js` beside it.
+  - `reportes.js` — aggregations, metrics, filtering and sorting for the reports module
+  - `enlaceReporte.js` — report state ⇄ URL query string (`leerEnlace`, `escribirEnlace`, `sanearFiltros`)
+  - `csv.js` — CSV construction and download (`;` separator + UTF-8 BOM for Spanish Excel)
+  - `evidencias.js` — evidence paths and signed URLs; imports the client lazily so the helpers stay testable without credentials
 - `src/components/` — feature components:
-  - `Login.jsx` — email/password login and self-registration
+  - `Login.jsx` — email/password login and password-reset request (self-registration is hidden when `VITE_DEMO_MODE` is on)
+  - `UpdatePassword.jsx` — new-password screen reached through the recovery link
+  - `EvidenceLink.jsx` — opens an evidence photo by minting a fresh signed URL
   - `Navbar.jsx` — sticky header with role-filtered navigation items
   - `KanbanBoard.jsx` — drag-and-drop Kanban board for all roles (uses `@dnd-kit/core`); Admin/Gestor get edit/delete/reopen buttons and a drag handle per card; Asignado gets full-card drag, forward-only transitions
   - `TaskCard.jsx` — individual task card with status transitions, photo upload, overdue indicator, edit/delete (used in TaskList only, kept for reference)
   - `TaskForm.jsx` — create/edit form with fields: nombre, detalles, asignado, categoría, área, fecha_limite, foto_requerida
   - `UserManagement.jsx` — user creation and role management (Admin only)
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
-  - `Reports.jsx` — task reports grouped by estado, asignado, or fecha (Admin/Gestor only)
+  - `Reports.jsx` — reports container (Admin/Gestor only): four tabs, the global filter bar, per-tab sort, CSV export, and the URL state. **The only module that touches `window.history`.**
+  - `components/reports/` — `Dashboard.jsx` (summary: KPIs, flow board, wait vs. work, recurring tasks, load), `graficas.jsx` (per-tab charts — components only, so React fast-refresh works), `base.jsx` (drawing primitives), `BarraFiltros.jsx`, `EncabezadoOrdenable.jsx`, `CollapsibleGroup.jsx`
 - `supabase/schema.sql` — full database schema: tables, triggers, RLS policies, seed data
-- `supabase/migrations/add_fecha_limite.sql` — adds `fecha_limite date` column to `tareas`
-- `supabase/migrations/storage_evidencias_policies.sql` — RLS policies for the `evidencias` Storage bucket
-- `supabase/migrations/security_rls_and_stability.sql` — adds `WITH CHECK` to Asignado update policy and `trg_restrict_asignado_update` trigger
+- `supabase/migrations/` — run in this order; the README lists it too:
+  1. `add_fecha_limite.sql` — adds `fecha_limite date` to `tareas`
+  2. `storage_evidencias_policies.sql` — initial policies for the `evidencias` bucket
+  3. `security_rls_and_stability.sql` — `WITH CHECK` on the Asignado update policy + `trg_restrict_asignado_update`
+  4. `add_fecha_inicio.sql` — adds `fecha_inicio` and replaces `trg_fecha_hecho` with `trg_marcas_de_tiempo`
+  5. `hardening_rls_demo_publica.sql` — policy hardening for public exposure
+  6. `storage_evidencias_privado.sql` — private bucket + ownership-scoped access
+- `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
 
 ## Database schema
 
 Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`
 
 Key behaviors:
-- `fecha_hecho` is set/cleared automatically by trigger `trg_fecha_hecho` when `estado` transitions to/from `'Hecho'`
+- `trg_marcas_de_tiempo` (from `add_fecha_inicio.sql`, replacing the older `trg_fecha_hecho`) stamps `fecha_hecho` on transitions to/from `'Hecho'` **and** `fecha_inicio` when a task first enters `'En curso'`. Without the start stamp only total elapsed time is measurable, which conflates waiting with working — the summary tab depends on this.
 - New auth users get a profile row in `usuarios` via the `on_auth_user_created` trigger with role `'Asignado'`
 - `get_my_role()` is a security-definer SQL function used in all RLS policies
 - RLS policies enforce: Admin/Gestor see all tasks; Asignado sees only tasks where `asignado_id = auth.uid()`
@@ -40,12 +54,11 @@ Key behaviors:
 
 ## Storage
 
-- Bucket: `evidencias` (public bucket — required for `getPublicUrl` to work)
-- RLS policies defined in `supabase/migrations/storage_evidencias_policies.sql`:
-  - INSERT: authenticated users can upload
-  - SELECT: public read
-  - DELETE: authenticated users can delete
-- Public URL stored in `tareas.evidencia_url` after upload
+- Bucket: `evidencias` — **private.** `storage_evidencias_privado.sql` sets `public = false` and replaces the original public-read policy.
+- `tareas.evidencia_url` stores the file **path**, not a URL: `{task_id}/{timestamp}.{ext}`. Signed URLs expire, so persisting one is meaningless. `toStoragePath()` in `src/lib/evidencias.js` still accepts the legacy full public URL so pre-migration rows keep opening.
+- Reads go through `createSignedUrl()` with a 60-second lifetime, minted at open time by `EvidenceLink.jsx`.
+- Policies scope access by task ownership: the path's first segment is the task id, compared against the task's `asignado_id`, so an Asignado reaches only their own evidence.
+- ⚠️ The migration and the signing code ship **together**. Running the SQL against a deployment that still calls `getPublicUrl()` makes every photo unreachable.
 
 ## Role system
 
@@ -71,6 +84,10 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 | `reports` | `Reports` | Administrador, Gestor |
 | `users` | `UserManagement` | Administrador |
 | `catalogs` | `CatalogManagement` | Administrador |
+
+`UpdatePassword` is not a `currentView`. `index.html` flags the recovery arrival on `window.__cafeminRecuperacion` **before** the bundle loads, because the Supabase client consumes and clears the URL fragment on init; `App.jsx` reads that flag and renders `UpdatePassword` instead of the app. Without the guard, following a recovery link would sign the person in without changing anything.
+
+Inside `reports`, the active tab, the filters and the sort are held in `Reports.jsx` state and mirrored into the query string. That is the app's only use of the URL — the rest of the navigation is still state-based.
 
 `KanbanBoard` adapts its behavior based on props: when `onEdit`/`onNew` are passed (Admin/Gestor), cards show a drag handle + action buttons; when omitted (Asignado), the full card is draggable with no action buttons.
 
@@ -117,7 +134,10 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 
 ## Environment and configuration
 
-- `.env.example` contains expected variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Expected variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (or legacy `VITE_SUPABASE_ANON_KEY`), `VITE_DEMO_MODE`
+- All of them are read in `src/supabaseClient.js` and `src/config.js` — nowhere else. **When renaming an env var, run `grep -rn "import.meta.env" src/` before declaring it done**; a second module-level reader is how this app once shipped a blank screen.
+- `VITE_*` values are baked in **at build time**. Changing one in Cloudflare requires a rebuild, not a redeploy.
+- Never use `service_role`, an `sb_secret_…` key or a Postgres connection string as a `VITE_*` variable: they land in the public bundle and bypass RLS entirely.
 - Enable Realtime for the `tareas` table in Supabase Dashboard (`Database → Replication`)
 - Never hardcode credentials in source files
 
@@ -128,6 +148,10 @@ npm install
 npm run dev
 npm run build
 npm run preview
+
+npm test              # Vitest — must stay green
+npm run lint          # ESLint — 0 errors; 3 known warnings are tracked, not new ones
+npm run format        # Prettier
 ```
 
 ## Coding guidance for AI agents
@@ -136,7 +160,8 @@ npm run preview
 - Preserve the existing Tailwind CSS utility-based styling — no CSS modules or styled-components.
 - Role guards must be kept in sync between Supabase RLS and `App.jsx`. Adding a new view requires both a role check in `App.jsx` and, if applicable, RLS policies.
 - State-based navigation is intentional. New views: add a `currentView` value in `App.jsx`, a role guard, and a nav item in `Navbar.jsx`.
-- Supabase access lives directly in components; import the client from `src/supabaseClient.js`.
+- Supabase access lives directly in components; import the client from `src/supabaseClient.js` — **never** `createClient` from `@supabase/supabase-js` (ESLint blocks it).
+- Business logic that can be quietly wrong — averages, time windows, ordering, serialization — goes in `src/lib/` as pure functions with a `.test.js` beside it, not inline in a component. Components render; `lib/` decides.
 - Use helpers from `src/utils/validation.js` for form and file validation — do not inline logic.
 - Schema changes go in `supabase/migrations/` as individual `.sql` files.
 - Storage bucket changes (policies, new buckets) also go in `supabase/migrations/`.
@@ -157,7 +182,9 @@ npm run preview
 
 ## Notes for future agents
 
-- No test suite exists. Adding Vitest + React Testing Library is the recommended next step, starting with `src/utils/validation.js`.
+- **A test suite exists**: Vitest, currently 134 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
+- Three ESLint warnings are known and deliberate for now (`useEffect` deps in `CatalogManagement.jsx` and `KanbanBoard.jsx`, unused `userProfile` in `Reports.jsx`). Do not add new ones; treat any fourth warning as a regression.
+- Prettier has not been run across the whole repo yet. When it is, it goes in its own commit so it never hides a real change in the diff.
 - `TaskList.jsx` is no longer used in the main navigation flow (all roles now use `KanbanBoard`). It is kept for reference but can be removed if the codebase is cleaned up.
 - `KanbanBoard` applies an optimistic update to `tasks` state immediately on drag-end for a responsive feel, then persists to Supabase. Realtime fires afterward and confirms the state.
 - `KanbanBoard` fetches `asignado:usuarios!asignado_id(id, nombre_completo)` to show the assignee name on admin cards. It does not fetch `creado_por` — do not reference `task.creador` inside `KanbanBoard` components.
@@ -173,4 +200,6 @@ npm run preview
 - Los guards de rol existen en dos capas (RLS + `App.jsx`). Mantén ambas sincronizadas.
 - Para crear usuarios desde el Admin, usa un cliente Supabase con `persistSession: false`.
 - Documenta en español e inglés cuando agregues comentarios técnicos o documentación de proyecto.
-- Sugiere pruebas unitarias con Vitest al proponer cambios en lógica de negocio.
+- Sugiere pruebas unitarias con Vitest al proponer cambios en lógica de negocio. El proyecto ya tiene suite: corre `npm test` antes de dar un cambio por terminado.
+- La lógica que se puede equivocar en silencio va en `src/lib/` como funciones puras con su `.test.js` al lado, no dentro de un componente.
+- Al renombrar una variable de entorno, corre `grep -rn "import.meta.env" src/` antes de darla por migrada.

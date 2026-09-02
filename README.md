@@ -24,8 +24,9 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 | 👤 **Gestión de usuarios** | El Admin crea usuarios con rol predefinido o los modifica después |
 | 📋 **Tablero Kanban** | Vista drag-and-drop para todos los roles (Pendiente → En curso → Hecho) |
 | 📅 **Fecha límite** | Campo opcional con alerta visual cuando la tarea está vencida |
-| 📷 **Evidencia fotográfica** | Si se requiere foto, el usuario debe subirla antes de marcar la tarea como Hecha |
-| 📊 **Reportes** | Agrupados por estado, por asignado o por fecha de creación |
+| 📷 **Evidencia fotográfica** | Si se requiere foto, el usuario debe subirla antes de marcar la tarea como Hecha; se guarda en un bucket privado y se abre con URL firmada |
+| 📊 **Reportes** | Resumen con el flujo de tareas y métricas, más tres listados (estado, asignado, fecha) con gráfica, orden por columna y exportación a CSV |
+| 🔗 **Vistas compartibles** | Filtros, pestaña y orden viven en la URL: se copia el enlace y quien lo abre ve exactamente lo mismo |
 | 🗂 **Catálogos** | CRUD de categorías y áreas de trabajo con edición inline |
 | ⚡ **Tiempo real** | Los cambios de otros usuarios se reflejan automáticamente |
 | 📱 **Diseño responsivo** | Interfaz optimizada para móvil y escritorio; menú hamburguesa en pantallas pequeñas |
@@ -57,8 +58,10 @@ Copia `.env.example` a `.env` y completa los valores de tu proyecto en Supabase:
 
 ```env
 VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
+
+> Se admite `VITE_SUPABASE_ANON_KEY` (la clave heredada, un JWT `eyJ…`) para no romper entornos existentes. Si están las dos, gana `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
 **3. Configurar Supabase**
 
@@ -100,28 +103,55 @@ npm run dev
 ```
 src/
 ├── App.jsx                    # Shell principal, rutas por estado y guards de rol
-├── supabaseClient.js          # Cliente Supabase (anon key)
+├── supabaseClient.js          # Único dueño de las variables de entorno; exporta
+│                              #   `supabase` y `createTransientClient()`
+├── config.js                  # Banderas de ambiente (VITE_DEMO_MODE)
 ├── main.jsx                   # Bootstrap de React
 ├── index.css                  # Estilos base (Tailwind)
 ├── components/
-│   ├── Login.jsx              # Login y registro por correo/contraseña
+│   ├── Login.jsx              # Login y solicitud de restablecimiento
+│   ├── UpdatePassword.jsx     # Pantalla de contraseña nueva tras el enlace de recuperación
 │   ├── Navbar.jsx             # Barra de navegación con menú filtrado por rol
+│   ├── DemoBanner.jsx         # Aviso de ambiente de demostración
 │   ├── KanbanBoard.jsx        # Tablero drag-and-drop para todos los roles (usa @dnd-kit)
 │   ├── TaskCard.jsx           # Tarjeta de tarea con acciones, foto y alerta de vencimiento
 │   ├── TaskForm.jsx           # Formulario de creación/edición de tareas
+│   ├── EvidenceLink.jsx       # Abre una evidencia pidiendo su URL firmada
 │   ├── UserManagement.jsx     # Alta y gestión de usuarios (solo Admin)
 │   ├── CatalogManagement.jsx  # CRUD de catálogos con edición inline (solo Admin)
-│   └── Reports.jsx            # Reportes por estado, asignado y fecha (Admin/Gestor)
+│   ├── Reports.jsx            # Contenedor de reportes: pestañas, filtros y estado en la URL
+│   └── reports/
+│       ├── Dashboard.jsx           # Resumen: KPIs, flujo, espera vs. trabajo, recurrentes, carga
+│       ├── graficas.jsx            # Gráficas por pestaña (solo componentes)
+│       ├── base.jsx                # Primitivas de dibujo compartidas por las gráficas
+│       ├── BarraFiltros.jsx        # Barra de filtros global, arriba de las pestañas
+│       ├── EncabezadoOrdenable.jsx # <th> con aria-sort e indicador de dirección
+│       └── CollapsibleGroup.jsx    # Grupo colapsable de filas
+├── lib/                       # Lógica pura, sin React y sin Supabase: se prueba sola
+│   ├── reportes.js            # Agregaciones, métricas, filtrado y ordenamiento
+│   ├── enlaceReporte.js       # Estado del reporte ⇄ cadena de consulta de la URL
+│   ├── csv.js                 # Construcción y descarga del CSV
+│   └── evidencias.js          # Rutas de evidencia y URLs firmadas
 └── utils/
     └── validation.js          # Helpers: validación de email, contraseña, tarea e imagen
 
 supabase/
 ├── schema.sql                 # Tablas, triggers, RLS y datos iniciales
-└── migrations/
-    ├── add_fecha_limite.sql               # Columna fecha_limite en tareas
-    ├── storage_evidencias_policies.sql    # Políticas RLS del bucket de evidencias
-    └── security_rls_and_stability.sql    # WITH CHECK Asignado + trigger de columnas
+├── migrations/                # Correr en el orden de la sección «Configurar Supabase»
+│   ├── add_fecha_limite.sql               # Columna fecha_limite en tareas
+│   ├── storage_evidencias_policies.sql    # Políticas iniciales del bucket de evidencias
+│   ├── security_rls_and_stability.sql     # WITH CHECK Asignado + trigger de columnas
+│   ├── add_fecha_inicio.sql               # Marca de entrada a «En curso» (trg_marcas_de_tiempo)
+│   ├── hardening_rls_demo_publica.sql     # Cierre de políticas para exposición pública
+│   └── storage_evidencias_privado.sql     # Bucket privado + acceso por propiedad de la tarea
+└── seeds/
+    ├── 01_cuentas_demo.sql    # Roles de las seis cuentas ficticias
+    └── 02_datos_demo.sql      # 90 tareas con fechas relativas a now()
 ```
+
+Cada archivo de `src/lib/` tiene su `.test.js` al lado. Ahí vive la lógica que se puede
+equivocar en silencio —promedios, ventanas de tiempo, orden— justamente para poder fijarla
+con pruebas sin montar un navegador.
 
 ### ⚙️ Comandos
 
@@ -144,10 +174,36 @@ npm run format:check  # Verifica formato sin escribir
 - **WITH CHECK en políticas UPDATE**: la política de Asignado tiene cláusula `WITH CHECK` para impedir auto-reasignación de tareas.
 - **Trigger de columnas**: el trigger `trg_restrict_asignado_update` restringe al Asignado a solo modificar `estado` y `evidencia_url`, bloqueando cambios a cualquier otro campo a nivel DB.
 - **Guards de rol en cliente**: `App.jsx` y `KanbanBoard.jsx` verifican el rol antes de permitir acciones, como capa adicional de defensa.
-- **Bucket de Storage con políticas explícitas**: el bucket `evidencias` define políticas de INSERT, SELECT y DELETE.
-  > ⚠️ **Pendiente antes de exponer la app en internet.** La política de SELECT concede lectura al rol `public` y el bucket está marcado como público, porque el cliente usa `getPublicUrl()`. Las fotos de evidencia son legibles por cualquiera que conozca su URL, sin sesión. Para un despliegue público hay que pasar el bucket a privado, guardar la ruta en lugar de la URL y migrar a `createSignedUrl()`.
+- **Bucket de evidencias privado**: `evidencias` no es público. La columna `tareas.evidencia_url` guarda la **ruta** del archivo (`{id_de_tarea}/{timestamp}.{ext}`), no una URL, y el cliente pide una URL firmada de 60 segundos con `createSignedUrl()` en el momento de abrirla. Las políticas de SELECT y DELETE comparan el primer segmento de la ruta contra el asignado de la tarea, así que un Asignado solo alcanza las evidencias de sus propias tareas.
+
+  > El motivo no es formal. En un refugio para personas migrantes, una foto de evidencia puede identificar a alguien en situación de vulnerabilidad; una URL pública permanente la deja legible para cualquiera que la reenvíe.
+
+  > ⚠️ `storage_evidencias_privado.sql` **va junto con el código que firma las URLs**. Correr la migración sobre un despliegue viejo deja las fotos inaccesibles. `toStoragePath()` tolera el formato heredado (URL pública completa) para que las filas anteriores a la migración sigan abriendo.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
+
+---
+
+### 📊 Reportes
+
+Cuatro pestañas. **Resumen** llega primero porque quien entra a reportes quiere saber cómo va todo antes de escarbar en un listado; las otras tres —**Por Estado**, **Por Asignado**, **Por Fecha**— listan tareas agrupadas.
+
+**El resumen** responde a las preguntas que un listado no contesta: cuántas tareas hay y qué proporción está cerrada, cuántas están vencidas, cuánto tarda una tarea de alta a cierre, cómo se reparte el trabajo por persona, categoría y área, qué tareas se repiten, y —el punto del tablero de flujo— dónde se atoran. Las cajas son inventario y las flechas son movimiento, con grosor proporcional.
+
+> **Espera y trabajo se miden sobre la misma población.** `metricasPorPersona` compara solo tareas cerradas *que además tienen marca de inicio*: mezclar la espera de todas las empezadas con el trabajo de las cerradas produce dos barras que no se pueden sumar. Por eso `add_fecha_inicio.sql` es obligatoria para que el resumen diga algo.
+
+**Una sola barra de filtros, arriba de las pestañas.** Búsqueda por nombre (ignora acentos y mayúsculas), periodo, persona —incluida la opción sintética *Sin asignar*—, estado, área y categoría. Se combinan con Y. Filtras una vez y responden el resumen, las tres pestañas **y la exportación**: el CSV entrega exactamente lo que estás viendo.
+
+**Orden por columna.** Clic en el encabezado. Las fechas arrancan de más nueva a más vieja y el texto de la A a la Z, porque es lo que se busca en cada caso. Los nulos quedan al final en ambas direcciones: una tarea sin cerrar no es «la más antigua». El estado ordena por el flujo (Pendiente → En curso → Hecho), no alfabéticamente. El criterio **no se comparte entre pestañas**: cada una muestra columnas distintas y arrastrarlo dejaría las filas ordenadas por algo que ahí no se ve.
+
+**La vista se comparte por su URL.** Filtros, pestaña y orden viven en la cadena de consulta, así que copiar la dirección basta para que otra persona abra exactamente lo mismo. Hay un botón *Copiar enlace de esta vista* porque, sin él, nadie descubre que la URL cambió.
+
+- Solo se escribe lo que se aparta del valor por defecto: entrar y no tocar nada deja la URL limpia, y un enlace con parámetros dice de verdad qué se filtró.
+- Se usa `replaceState`, no `pushState`: el buscador dispara un cambio por tecla y con historial el botón «atrás» exigiría una pulsación por letra tecleada.
+- Los valores de conjunto cerrado —pestaña, periodo, estado, campo y dirección de orden— se validan; un enlace mal editado abre el reporte normal en vez de romperse.
+- Una persona o un área que ya no existe en los datos se descarta al cargar. Dejarla puesta mostraría el selector en blanco y la tabla en cero, sin nada que explique por qué.
+
+El módulo `src/lib/enlaceReporte.js` es puro —cadena entra, estado sale— para poder fijar el ida y vuelta con pruebas sin navegador. `Reports.jsx` es el único que toca `window.history`.
 
 ---
 
@@ -257,8 +313,9 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 | 👤 **User management** | Admin creates users with a preset role or modifies them later |
 | 📋 **Kanban board** | Drag-and-drop view for all roles (Pending → In progress → Done) |
 | 📅 **Due date** | Optional field with visual overdue alert |
-| 📷 **Photo evidence** | If required, the user must upload a photo before marking a task as Done |
-| 📊 **Reports** | Grouped by status, by assignee, or by creation date |
+| 📷 **Photo evidence** | If required, the user must upload a photo before marking a task as Done; stored in a private bucket, opened via signed URL |
+| 📊 **Reports** | A summary tab with task flow and metrics, plus three listings (status, assignee, date) with a chart, column sorting and CSV export |
+| 🔗 **Shareable views** | Filters, tab and sort live in the URL: copy the link and the recipient sees exactly the same view |
 | 🗂 **Catalogs** | CRUD for categories and work areas with inline editing |
 | ⚡ **Real-time** | Changes from other users appear automatically |
 | 📱 **Responsive design** | Mobile-first layout; hamburger menu on small screens, scrollable tables |
@@ -290,8 +347,10 @@ Copy `.env.example` to `.env` and fill in your Supabase project values:
 
 ```env
 VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
+
+> The legacy `VITE_SUPABASE_ANON_KEY` (a `eyJ…` JWT) is still accepted so existing environments keep working. When both are set, `VITE_SUPABASE_PUBLISHABLE_KEY` wins.
 
 **3. Configure Supabase**
 
@@ -333,28 +392,55 @@ npm run dev
 ```
 src/
 ├── App.jsx                    # Main shell, state-based routing and role guards
-├── supabaseClient.js          # Supabase client (anon key)
+├── supabaseClient.js          # Sole owner of the env vars; exports `supabase`
+│                              #   and `createTransientClient()`
+├── config.js                  # Environment flags (VITE_DEMO_MODE)
 ├── main.jsx                   # React bootstrap
 ├── index.css                  # Base styles (Tailwind)
 ├── components/
-│   ├── Login.jsx              # Email/password login and sign-up
+│   ├── Login.jsx              # Login and password-reset request
+│   ├── UpdatePassword.jsx     # New-password screen after the recovery link
 │   ├── Navbar.jsx             # Navigation bar with role-filtered menu
+│   ├── DemoBanner.jsx         # Demo-environment notice
 │   ├── KanbanBoard.jsx        # Drag-and-drop board for all roles (uses @dnd-kit)
 │   ├── TaskCard.jsx           # Task card with actions, photo upload and overdue alert
 │   ├── TaskForm.jsx           # Task create/edit form
+│   ├── EvidenceLink.jsx       # Opens an evidence photo via a freshly signed URL
 │   ├── UserManagement.jsx     # User creation and management (Admin only)
 │   ├── CatalogManagement.jsx  # Catalog CRUD with inline editing (Admin only)
-│   └── Reports.jsx            # Reports by status, assignee and date (Admin/Gestor)
+│   ├── Reports.jsx            # Reports container: tabs, filters and URL state
+│   └── reports/
+│       ├── Dashboard.jsx           # Summary: KPIs, flow, wait vs. work, recurring, load
+│       ├── graficas.jsx            # Per-tab charts (components only)
+│       ├── base.jsx                # Drawing primitives shared by the charts
+│       ├── BarraFiltros.jsx        # Global filter bar, above the tabs
+│       ├── EncabezadoOrdenable.jsx # <th> with aria-sort and a direction indicator
+│       └── CollapsibleGroup.jsx    # Collapsible row group
+├── lib/                       # Pure logic — no React, no Supabase — tested on its own
+│   ├── reportes.js            # Aggregations, metrics, filtering and sorting
+│   ├── enlaceReporte.js       # Report state ⇄ URL query string
+│   ├── csv.js                 # CSV construction and download
+│   └── evidencias.js          # Evidence paths and signed URLs
 └── utils/
     └── validation.js          # Helpers: email, password, task and image validation
 
 supabase/
 ├── schema.sql                 # Tables, triggers, RLS policies and seed data
-└── migrations/
-    ├── add_fecha_limite.sql               # fecha_limite column in tareas
-    ├── storage_evidencias_policies.sql    # RLS policies for the evidence bucket
-    └── security_rls_and_stability.sql    # WITH CHECK for Asignado + column-lock trigger
+├── migrations/                # Run in the order listed under "Configure Supabase"
+│   ├── add_fecha_limite.sql               # fecha_limite column in tareas
+│   ├── storage_evidencias_policies.sql    # Initial evidence-bucket policies
+│   ├── security_rls_and_stability.sql     # WITH CHECK for Asignado + column-lock trigger
+│   ├── add_fecha_inicio.sql               # "En curso" stamp (trg_marcas_de_tiempo)
+│   ├── hardening_rls_demo_publica.sql     # Policy hardening for public exposure
+│   └── storage_evidencias_privado.sql     # Private bucket + ownership-scoped access
+└── seeds/
+    ├── 01_cuentas_demo.sql    # Roles for the six fictitious accounts
+    └── 02_datos_demo.sql      # 90 tasks with dates relative to now()
 ```
+
+Every file in `src/lib/` has its `.test.js` beside it. That is where the logic that can be
+quietly wrong lives — averages, time windows, ordering — precisely so it can be pinned by
+tests without booting a browser.
 
 ### ⚙️ Commands
 
@@ -377,10 +463,34 @@ npm run format:check  # Check formatting without writing
 - **WITH CHECK on UPDATE policies**: the Asignado policy includes a `WITH CHECK` clause to prevent self-reassignment of tasks.
 - **Column-lock trigger**: `trg_restrict_asignado_update` ensures Asignado can only modify `estado` and `evidencia_url` at the DB level, blocking all other field changes.
 - **Client-side role guards**: `App.jsx` and `KanbanBoard.jsx` verify the role before allowing actions, as an additional defense-in-depth layer.
-- **Storage bucket with explicit policies**: the `evidencias` bucket defines INSERT, SELECT and DELETE policies.
-  > ⚠️ **Outstanding before exposing the app on the internet.** The SELECT policy grants read access to the `public` role and the bucket is marked public, because the client uses `getPublicUrl()`. Evidence photos are readable by anyone who knows the URL, with no session. A public deployment requires making the bucket private, storing the path instead of the URL, and migrating to `createSignedUrl()`.
+- **Private evidence bucket**: `evidencias` is not public. `tareas.evidencia_url` stores the file **path** (`{task_id}/{timestamp}.{ext}`), not a URL, and the client mints a 60-second signed URL with `createSignedUrl()` at open time. SELECT and DELETE policies match the path's first segment against the task's assignee, so an Asignado can only reach evidence for their own tasks. In a shelter for migrants, an evidence photo can identify a vulnerable person — a permanent public URL leaves that readable to anyone it is forwarded to.
+
+  > ⚠️ `storage_evidencias_privado.sql` must ship **with** the code that signs URLs; running it against an older deployment makes photos unreachable. `toStoragePath()` tolerates the legacy full public URL so pre-migration rows keep opening.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
+
+---
+
+### 📊 Reports
+
+Four tabs. **Resumen** (summary) comes first — a report reader wants the shape of things before digging into a listing — followed by three listings: **Por Estado**, **Por Asignado**, **Por Fecha**.
+
+The summary answers what a listing cannot: how much is closed, how much is overdue, how long a task takes from creation to close, how the load splits by person, category and area, which tasks recur, and — the point of the flow board — where work piles up. Boxes are stock, arrows are flow with proportional thickness.
+
+> **Wait and work are measured over the same population.** `metricasPorPersona` uses only closed tasks *that also carry a start stamp*: mixing the wait of every started task with the work of closed ones yields two bars that cannot be added. This is why `add_fecha_inicio.sql` is required for the summary to mean anything.
+
+**One global filter bar, above the tabs**: name search (accent- and case-insensitive), period, person — including the synthetic *Sin asignar* option — status, area and category, combined with AND. Filter once and the summary, all three tabs **and the export** follow: the CSV carries exactly what is on screen.
+
+**Column sorting.** Dates start newest-first and text A–Z, because that is what each is wanted for. Nulls stay last in both directions — an unfinished task is not "the oldest". Status sorts by flow order (Pendiente → En curso → Hecho), not alphabetically. The criterion is **not shared across tabs**: each shows different columns, and carrying it over would sort rows by something invisible there.
+
+**The view is shared by its URL.** Filters, tab and sort live in the query string, so copying the address is enough for someone else to open the same thing; a *Copiar enlace de esta vista* button makes that discoverable.
+
+- Only non-default values are written, so an untouched report keeps a clean URL and a link with parameters really says what was filtered.
+- `replaceState`, not `pushState`: the search box fires per keystroke, and history entries would make Back require one press per letter typed.
+- Closed-set values — tab, period, status, sort field and direction — are validated; a mangled link opens the normal report instead of breaking.
+- A person or area no longer present in the data is dropped on load, rather than leaving a blank dropdown over an empty table with nothing to explain it.
+
+`src/lib/enlaceReporte.js` is pure — string in, state out — so the round trip is pinned by tests without a browser. `Reports.jsx` is the only place that touches `window.history`.
 
 ---
 

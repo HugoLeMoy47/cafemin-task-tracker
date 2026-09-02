@@ -13,6 +13,7 @@ import {
   FILTRO_VACIO,
   CAMPOS_ORDEN,
 } from '../lib/reportes'
+import { leerEnlace, escribirEnlace, sanearFiltros } from '../lib/enlaceReporte'
 import BarraFiltros from './reports/BarraFiltros'
 import EncabezadoOrdenable from './reports/EncabezadoOrdenable'
 import { GraficaEstado, GraficaAsignado, GraficaSemanal } from './reports/graficas'
@@ -93,11 +94,28 @@ function direccionInicial(campo) {
 
 const tdBase = 'px-4 py-2.5'
 
+const TAB_POR_DEFECTO = 'Resumen'
+const OPCIONES_ENLACE = { tabs: TABS, tabPorDefecto: TAB_POR_DEFECTO, ordenInicial: ORDEN_INICIAL }
+
+/**
+ * Estado inicial tomado de la URL. Va en inicializadores perezosos y no en un
+ * efecto: si se leyera después del primer render, quien abre un enlace filtrado
+ * vería un parpadeo con el reporte completo antes de que se aplique el filtro,
+ * y sobre 90 tareas eso se nota.
+ * Read in lazy initializers, not in an effect: reading after the first render
+ * would flash the unfiltered report before the filter lands.
+ */
+function estadoInicial() {
+  return leerEnlace(typeof window === 'undefined' ? '' : window.location.search, OPCIONES_ENLACE)
+}
+
 export default function Reports({ userProfile }) {
+  const [inicial] = useState(estadoInicial)
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState('')
-  const [tab, setTab] = useState('Resumen')
+  const [tab, setTab] = useState(inicial.tab)
+  const [enlaceCopiado, setEnlaceCopiado] = useState('')
   /**
    * Grupos abiertos, por clave. Arrancan cerrados: con 90 tareas, abrir todo
    * de entrada entierra los conteos, que es justamente el resumen que se busca
@@ -108,7 +126,7 @@ export default function Reports({ userProfile }) {
   const [abiertos, setAbiertos] = useState(() => new Set())
 
   /** Filtro global: gobierna el resumen, las tres pestañas y la exportación. */
-  const [filtros, setFiltros] = useState(FILTRO_VACIO)
+  const [filtros, setFiltros] = useState(inicial.filtros)
 
   /**
    * Orden por pestaña, no compartido. Cada pestaña muestra columnas distintas;
@@ -117,7 +135,9 @@ export default function Reports({ userProfile }) {
    * Per-tab sort: carrying one tab's criterion into another would order rows by
    * something that tab does not display.
    */
-  const [ordenes, setOrdenes] = useState(ORDEN_INICIAL)
+  const [ordenes, setOrdenes] = useState(() =>
+    inicial.orden ? { ...ORDEN_INICIAL, [inicial.tab]: inicial.orden } : ORDEN_INICIAL
+  )
 
   const estaAbierto = (clave) => abiertos.has(clave)
   const alternar = (clave) =>
@@ -142,12 +162,56 @@ export default function Reports({ userProfile }) {
       if (error) {
         setFetchError('No se pudieron cargar los reportes. Verifica tu conexión.')
       } else {
-        setTasks(data || [])
+        const filas = data || []
+        setTasks(filas)
+        // Un enlace puede nombrar a alguien que ya no tiene tareas, o un área
+        // que se borró del catálogo. Se descarta ese filtro en vez de dejar el
+        // selector en blanco y la tabla en cero sin explicación.
+        // A link may name someone or something no longer in the data.
+        setFiltros((prev) => sanearFiltros(prev, opcionesDeFiltro(filas)))
       }
       setLoading(false)
     }
     fetchAll()
   }, [])
+
+  /**
+   * Refleja el estado en la barra de direcciones.
+   *
+   * Es `replaceState` y no `pushState` a propósito: escribir en el buscador
+   * dispara un cambio por tecla, y con `pushState` el botón «atrás» tendría
+   * que pulsarse una vez por letra para salir del reporte. El enlace se
+   * comparte copiando la URL, no navegando el historial.
+   *
+   * Deliberately replaceState: the search box fires per keystroke, and
+   * pushState would make Back require one press per letter typed.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const consulta = escribirEnlace({ tab, filtros, orden: ordenes[tab] }, OPCIONES_ENLACE)
+    const destino = `${window.location.pathname}${consulta ? `?${consulta}` : ''}${window.location.hash}`
+    if (destino !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(null, '', destino)
+    }
+  }, [tab, filtros, ordenes])
+
+  /** El aviso de «enlace copiado» se borra solo; no merece un botón para cerrarlo. */
+  useEffect(() => {
+    if (!enlaceCopiado) return undefined
+    const t = setTimeout(() => setEnlaceCopiado(''), 2500)
+    return () => clearTimeout(t)
+  }, [enlaceCopiado])
+
+  async function copiarEnlace() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setEnlaceCopiado('Enlace copiado')
+    } catch {
+      // Sin permiso de portapapeles (contexto no seguro, o el usuario lo negó).
+      // Decirle dónde está el enlace es más útil que un error.
+      setEnlaceCopiado('Copia la URL desde la barra de direcciones')
+    }
+  }
 
   if (loading) return <div className="text-center py-12 text-gray-400 dark:text-gray-500">Cargando reportes...</div>
 
@@ -267,6 +331,8 @@ export default function Reports({ userProfile }) {
         opciones={opciones}
         mostradas={filtradas.length}
         total={tasks.length}
+        onCopiarEnlace={copiarEnlace}
+        avisoEnlace={enlaceCopiado}
       />
 
       {filtradas.length === 0 ? (
