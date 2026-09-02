@@ -58,11 +58,23 @@ describe('reglas del proyecto / project rules', () => {
     expect(mensajeDeError(error, 'respaldo')).toBe(REGLAS_DEL_PROYECTO.PT003)
   })
 
-  it('las cinco reglas tienen texto / all five rules have text', () => {
-    for (const pt of ['PT001', 'PT002', 'PT003', 'PT004', 'PT005']) {
+  it('todas las reglas tienen texto / every rule has text', () => {
+    // Si una migración define un código nuevo y nadie lo agrega aquí, el
+    // Administrador ve el respaldo genérico en vez de la razón real.
+    for (const pt of ['PT001', 'PT002', 'PT003', 'PT004', 'PT005', 'PT006', 'PT007', 'PT008', 'PT009']) {
       expect(mensajeDeError({ code: pt })).toBe(REGLAS_DEL_PROYECTO[pt])
       expect(REGLAS_DEL_PROYECTO[pt].length).toBeGreaterThan(20)
     }
+  })
+})
+
+describe('reglas de gestión de accesos / access-management rules', () => {
+  it('explica por qué no se puede dejar el sistema sin Administrador', () => {
+    expect(mensajeDeError({ code: 'PT006' }, 'respaldo')).toMatch(/Administrador/)
+  })
+
+  it('explica que no puedes desactivarte a ti mismo', () => {
+    expect(mensajeDeError({ code: 'PT008' }, 'respaldo')).toMatch(/tu propio acceso/i)
   })
 })
 

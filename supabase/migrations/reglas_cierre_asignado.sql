@@ -99,7 +99,14 @@ declare
 begin
   new.evidencia_url := _evidencia;
 
-  if get_my_role() <> 'Asignado' then
+  -- `coalesce` y no `<>` a secas: `get_my_role()` devuelve NULL para
+  -- service_role y para procesos sin sesión, y en SQL `NULL <> 'Asignado'` no
+  -- es cierto sino NULL — sin el coalesce el `if` no se cumpliría y las reglas
+  -- SÍ se aplicarían a esos procesos, al revés de lo que dice el comentario de
+  -- arriba. La lógica de tres valores no perdona.
+  -- Without coalesce, NULL <> 'Asignado' is NULL, not true, and the rules would
+  -- apply to service_role — the opposite of what is documented above.
+  if coalesce(get_my_role(), '') <> 'Asignado' then
     return new;
   end if;
 

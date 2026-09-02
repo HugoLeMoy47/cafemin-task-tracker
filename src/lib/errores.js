@@ -37,6 +37,11 @@ export const REGLAS_DEL_PROYECTO = {
   PT003: 'Esta tarea requiere foto de evidencia para marcarse como Hecha.',
   PT004: 'La evidencia debe pertenecer a esta tarea.',
   PT005: 'No se puede quitar la evidencia de una tarea ya cerrada.',
+  PT006:
+    'No se puede dejar el sistema sin ningún Administrador activo. Asigna ese rol a otra persona primero.',
+  PT007: 'Solo un Administrador puede cambiar el acceso de otras personas.',
+  PT008: 'No puedes desactivar tu propio acceso. Pídeselo a otro Administrador.',
+  PT009: 'No se encontró a esa persona.',
 }
 
 /**

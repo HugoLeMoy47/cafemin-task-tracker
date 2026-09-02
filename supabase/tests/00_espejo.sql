@@ -44,7 +44,9 @@ create schema storage;
 create table auth.users (
   id uuid primary key,
   email text,
-  raw_user_meta_data jsonb
+  raw_user_meta_data jsonb,
+  -- Supabase la usa para bloquear el inicio de sesión de una cuenta.
+  banned_until timestamptz
 );
 
 -- Supabase resuelve auth.uid() desde el JWT. Aquí sale de un GUC de sesión,
@@ -89,6 +91,7 @@ end $$;
 \ir ../migrations/reglas_cierre_asignado.sql
 \ir ../migrations/search_path_handle_new_user.sql
 \ir ../migrations/proteger_ultimo_administrador.sql
+\ir ../migrations/desactivacion_de_usuarios.sql
 
 
 -- ---------------------------------------------------------------------------

@@ -42,6 +42,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   7. `reglas_cierre_asignado.sql` — moves the task-closing rules out of the client (see below)
   8. `search_path_handle_new_user.sql` — pins the last mutable `search_path`
   9. `proteger_ultimo_administrador.sql` — refuses to demote or delete the last admin (`PT006`)
+  10. `desactivacion_de_usuarios.sql` — `activo` flag, `desactivar_usuario()` / `reactivar_usuario()`, and removal of the DELETE policy on `usuarios`
 - `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
 - `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
@@ -196,7 +197,7 @@ npm run format        # Prettier
 
 ## Notes for future agents
 
-- **A test suite exists**: Vitest, currently 190 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`, plus the SQL suite in `supabase/tests/`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
+- **A test suite exists**: Vitest, currently 190 tests, plus 48 cases in the SQL suite across `src/lib/*.test.js` and `src/utils/validation.test.js`, plus the SQL suite in `supabase/tests/`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
 - Three ESLint warnings are known and deliberate for now (`useEffect` deps in `CatalogManagement.jsx` and `KanbanBoard.jsx`, unused `userProfile` in `Reports.jsx`). Do not add new ones; treat any fourth warning as a regression.
 - Prettier has not been run across the whole repo yet. When it is, it goes in its own commit so it never hides a real change in the diff.
 - `TaskList.jsx` is no longer used in the main navigation flow (all roles now use `KanbanBoard`). It is kept for reference but can be removed if the codebase is cleaned up.

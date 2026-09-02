@@ -21,7 +21,7 @@ falla, así que también sirve tal cual en un pipeline.
 | Archivo | Qué hace |
 |---|---|
 | `00_espejo.sql` | Levanta el espejo. Simula `auth.uid()` y los objetos mínimos de `storage`, y luego **ejecuta los archivos de migración reales** en el orden documentado. |
-| `01_reglas_asignado.sql` | 21 casos: los ataques que deben rebotar, el uso normal que no debe romperse, los controles previos que deben seguir aguantando, y la higiene de las funciones `SECURITY DEFINER`. |
+| `01_reglas_asignado.sql` | 48 casos: los ataques que deben rebotar, el uso normal que no debe romperse, los controles previos que deben seguir aguantando, y la higiene de las funciones `SECURITY DEFINER`. |
 
 El espejo corre los archivos reales con `\ir`, no una copia de su contenido.
 Es deliberado: una copia se desincroniza y entonces la suite pasa mientras el
@@ -51,7 +51,7 @@ rompió el flujo de trabajo normal.
 
 ## Códigos de error del proyecto
 
-Definidos en `../migrations/reglas_cierre_asignado.sql`. Existen para que la
+Definidos en `../migrations/reglas_cierre_asignado.sql`, `proteger_ultimo_administrador.sql` y `desactivacion_de_usuarios.sql`. Existen para que la
 capa de mensajes del cliente pueda traducirlos sin adivinar por el texto.
 
 | Código | Regla |
@@ -61,6 +61,10 @@ capa de mensajes del cliente pueda traducirlos sin adivinar por el texto.
 | `PT003` | Sin evidencia no se cierra una tarea que la exige. |
 | `PT004` | La evidencia debe pertenecer a la propia tarea. |
 | `PT005` | No se quita la evidencia de una tarea ya cerrada. |
+| `PT006` | No se puede dejar el sistema sin Administrador activo. |
+| `PT007` | Solo un Administrador desactiva o reactiva accesos. |
+| `PT008` | Nadie puede desactivar su propio acceso. |
+| `PT009` | La persona indicada no existe. |
 
 ## Al cambiar una política o un trigger
 

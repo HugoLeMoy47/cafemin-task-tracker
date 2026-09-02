@@ -220,9 +220,14 @@ select _probar('Último Admin', 'No se puede degradar al último Administrador',
   $$update usuarios set rol = 'Gestor'
      where id = '11111111-1111-1111-1111-111111111111'$$, 'PT006');
 
-select _probar('Último Admin', 'No se puede borrar el perfil del último Administrador',
+-- Desde `desactivacion_de_usuarios.sql` ya no existe política de DELETE sobre
+-- `usuarios`, así que el borrado no llega ni al trigger: RLS lo filtra y no
+-- toca ninguna fila. La protección se cumple por una vía distinta, y el caso se
+-- deja para que se note si alguien vuelve a abrir ese camino.
+-- The DELETE policy is gone, so RLS filters it before the trigger ever runs.
+select _probar('Último Admin', 'El borrado de perfiles ya no existe como camino',
   $$delete from usuarios
-     where id = '11111111-1111-1111-1111-111111111111'$$, 'PT006');
+     where id = '11111111-1111-1111-1111-111111111111'$$, 'CERO');
 
 -- Ahora hay dos. La regla debe dejar de estorbar.
 select _probar('Último Admin', 'Se puede nombrar a un segundo Administrador',
@@ -247,6 +252,98 @@ select _probar('Último Admin', 'Editar otro campo del Administrador no estorba'
 -- Se restaura el estado para no arrastrar efectos al grupo siguiente.
 update usuarios set rol = 'Administrador'
  where id = '11111111-1111-1111-1111-111111111111';
+
+
+-- ===========================================================================
+-- GRUPO 3c — Desactivar el acceso de verdad (H13)
+--
+-- Lo que se prueba aquí no es "el botón funciona", sino las tres cosas que lo
+-- hacen distinto de un borrado: que el acceso se corta en la base y no solo en
+-- la interfaz, que la HISTORIA se conserva, y que la puerta no se puede abrir
+-- desde un rol que no debe.
+-- ===========================================================================
+
+-- Quién puede llamar a la función.
+set demo.uid = '22222222-2222-2222-2222-222222222222';   -- Asignado
+select _probar('Desactivación', 'Un Asignado no puede desactivar a nadie',
+  $$select desactivar_usuario('33333333-3333-3333-3333-333333333333')$$, 'PT007');
+
+set demo.uid = '11111111-1111-1111-1111-111111111111';   -- Administrador
+select _probar('Desactivación', 'El Administrador no puede desactivarse a sí mismo',
+  $$select desactivar_usuario('11111111-1111-1111-1111-111111111111')$$, 'PT008');
+
+select _probar('Desactivación', 'Un id inexistente da un error claro',
+  $$select desactivar_usuario('99999999-9999-9999-9999-999999999999')$$, 'PT009');
+
+select _probar('Desactivación', 'El Administrador sí puede desactivar a alguien',
+  $$select desactivar_usuario('22222222-2222-2222-2222-222222222222')$$, 'OK');
+
+-- El efecto en la base, no en la pantalla.
+select _contar('Desactivación', 'La marca quedó puesta',
+  $$select count(*)::int from usuarios
+     where id = '22222222-2222-2222-2222-222222222222' and not activo$$, 1);
+
+reset role;
+select _contar('Desactivación', 'La cuenta quedó baneada en Auth',
+  $$select count(*)::int from auth.users
+     where id = '22222222-2222-2222-2222-222222222222' and banned_until > now()$$, 1);
+
+-- LA PRUEBA QUE JUSTIFICA TODO EL CAMBIO: la historia sobrevive.
+-- Con el borrado anterior, estas tareas se quedaban sin asignado en silencio.
+select _contar('Desactivación', 'Sus tareas CONSERVAN a quién estaban asignadas',
+  $$select count(*)::int from tareas
+     where asignado_id = '22222222-2222-2222-2222-222222222222'$$, 5);
+
+-- Y la persona desactivada deja de ver el sistema, aunque tenga sesión válida.
+set role app_user;
+set demo.uid = '22222222-2222-2222-2222-222222222222';
+select _contar('Desactivación', 'Ya no tiene rol', $$select count(get_my_role())::int$$, 0);
+select _contar('Desactivación', 'Ya no ve ninguna tarea', $$select count(*)::int from tareas$$, 0);
+-- Sí sigue viendo SU PROPIA fila, y es a propósito: la política "Read own
+-- usuario" no mira `activo`, y gracias a eso App.jsx puede leer el perfil y
+-- explicarle que su acceso fue desactivado en vez de mostrarle una pantalla
+-- rota. No hay fuga: son sus propios datos.
+-- Deliberate: it lets the app explain the situation instead of breaking.
+select _contar('Desactivación', 'Sigue viendo su propia fila, para poder explicárselo',
+  $$select count(*)::int from usuarios$$, 1);
+
+select _probar('Desactivación', 'Desactivada, tampoco puede reactivarse sola',
+  $$select reactivar_usuario('22222222-2222-2222-2222-222222222222')$$, 'PT007');
+
+-- Reactivar devuelve todo.
+set demo.uid = '11111111-1111-1111-1111-111111111111';
+select _probar('Desactivación', 'El Administrador puede reactivar',
+  $$select reactivar_usuario('22222222-2222-2222-2222-222222222222')$$, 'OK');
+
+reset role;
+select _contar('Desactivación', 'El baneo de Auth se levantó',
+  $$select count(*)::int from auth.users
+     where id = '22222222-2222-2222-2222-222222222222'
+       and (banned_until is null or banned_until <= now())$$, 1);
+
+set role app_user;
+set demo.uid = '22222222-2222-2222-2222-222222222222';
+select _contar('Desactivación', 'Vuelve a ver sus tareas',
+  $$select count(*)::int from tareas$$, 5);
+
+-- No se puede dejar el sistema sin Administrador ACTIVO.
+set demo.uid = '11111111-1111-1111-1111-111111111111';
+select _probar('Desactivación', 'Nombrar a un segundo Administrador',
+  $$update usuarios set rol = 'Administrador'
+     where id = '33333333-3333-3333-3333-333333333333'$$, 'OK');
+select _probar('Desactivación', 'Desactivar a un Administrador cuando hay dos',
+  $$select desactivar_usuario('33333333-3333-3333-3333-333333333333')$$, 'OK');
+select _probar('Desactivación', 'Con uno activo, ya no se puede degradar',
+  $$update usuarios set rol = 'Gestor'
+     where id = '11111111-1111-1111-1111-111111111111'$$, 'PT006');
+
+-- Y el borrado ya no existe como camino.
+select _probar('Desactivación', 'Ya no se puede borrar un perfil desde la app',
+  $$delete from usuarios where id = '33333333-3333-3333-3333-333333333333'$$, 'CERO');
+
+-- Se restaura para el grupo siguiente.
+select reactivar_usuario('33333333-3333-3333-3333-333333333333');
+update usuarios set rol = 'Asignado' where id = '33333333-3333-3333-3333-333333333333';
 
 
 -- ===========================================================================

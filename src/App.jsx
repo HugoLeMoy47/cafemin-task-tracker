@@ -134,6 +134,43 @@ export default function App() {
     )
   }
 
+  /**
+   * Acceso desactivado por un Administrador.
+   *
+   * La base ya lo bloqueó todo —`get_my_role()` devuelve nulo, así que ninguna
+   * política concede nada— y esta pantalla existe solo para que la persona
+   * entienda qué pasó. Sin ella vería la aplicación vacía, sin tareas ni menú,
+   * como si estuviera rota.
+   *
+   * Puede leer su propia fila porque la política "Read own usuario" no mira
+   * `activo`, y es justo lo que hace posible explicárselo.
+   *
+   * The database already denied everything; this screen exists so the person
+   * understands why, instead of seeing an app that looks broken.
+   */
+  if (userProfile && userProfile.activo === false) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+        <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-md max-w-sm">
+          <div className="text-4xl mb-4">🔒</div>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
+            Tu acceso está desactivado
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            Un Administrador desactivó el acceso de esta cuenta. Si crees que es un error,
+            comunícate con quien administra el sistema.
+          </p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const isAdmin = userProfile?.rol === 'Administrador'
   const isGestor = userProfile?.rol === 'Gestor'
 

@@ -106,11 +106,51 @@ export default function UserManagement() {
     setUpdatingId(null)
   }
 
-  async function deleteUser(userId, nombre) {
-    if (!window.confirm(`¿Eliminar el perfil de ${nombre}? Esta acción no elimina la cuenta de autenticación.`)) return
-    const { error } = await supabase.from('usuarios').delete().eq('id', userId)
-    if (error) setError(mensajeDeError(error, 'No se pudo eliminar el perfil.'))
-    else fetchUsuarios()
+  /**
+   * Desactiva o reactiva el acceso de una persona.
+   *
+   * Sustituye al botón "Eliminar", que borraba la fila de `usuarios` y nada
+   * más. Eso dejaba viva la cuenta de autenticación —la credencial seguía
+   * funcionando— y, peor, desasignaba en silencio TODAS sus tareas, incluidas
+   * las ya cerradas: `tareas.asignado_id` tiene `on delete set null`. En un
+   * sistema cuyo argumento es la trazabilidad, borrar quién cerró una tarea es
+   * peor que el problema de acceso.
+   *
+   * Ahora la fila se queda —la historia se conserva— y el corte ocurre en dos
+   * capas: `get_my_role()` devuelve nulo, así que la base deniega todo incluso
+   * a una sesión ya abierta, y la cuenta queda baneada en Auth, así que la
+   * credencial deja de servir.
+   *
+   * La lógica vive en una función de la base y no aquí porque escribir en
+   * `auth.users` exige privilegios que el navegador no tiene —ni debe tener—.
+   *
+   * Replaces "Delete", which left the auth account alive and silently
+   * unassigned every task the person had closed.
+   */
+  async function cambiarAcceso(usuario) {
+    const desactivando = usuario.activo !== false
+    const pregunta = desactivando
+      ? `¿Desactivar el acceso de ${usuario.nombre_completo}? No podrá iniciar sesión. Sus tareas y su historial se conservan, y puedes reactivarla después.`
+      : `¿Reactivar el acceso de ${usuario.nombre_completo}?`
+    if (!window.confirm(pregunta)) return
+
+    setUpdatingId(usuario.id)
+    setError('')
+    const { error } = await supabase.rpc(
+      desactivando ? 'desactivar_usuario' : 'reactivar_usuario',
+      { _id: usuario.id }
+    )
+    if (error) {
+      setError(
+        mensajeDeError(
+          error,
+          desactivando ? 'No se pudo desactivar el acceso.' : 'No se pudo reactivar el acceso.'
+        )
+      )
+    } else {
+      fetchUsuarios()
+    }
+    setUpdatingId(null)
   }
 
   return (
@@ -125,7 +165,8 @@ export default function UserManagement() {
         </button>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-        Crea usuarios y asígnales un rol, o modifica los roles de usuarios existentes.
+        Crea usuarios, asígnales un rol o desactiva su acceso. Desactivar no borra nada:
+        la persona deja de poder entrar, pero sus tareas conservan su autoría.
       </p>
 
       {/* Formulario de creación */}
@@ -204,14 +245,34 @@ export default function UserManagement() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nombre</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Correo</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Rol</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Acceso</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {/* La atenuación de una fila desactivada va SOLO en las celdas
+                    de identidad, no en la fila entera: atenuar todo bajaba el
+                    contraste del enlace "Reactivar" a ~2.8:1 sobre blanco, y
+                    ese es justamente el único control que hay que poder pulsar
+                    ahí. La insignia de estado ya comunica la baja.
+                    Dimming the whole row killed the contrast of the one control
+                    that must stay usable on it. */}
                 {usuarios.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{u.nombre_completo}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{u.correo}</td>
+                    <td
+                      className={`px-4 py-3 font-medium text-gray-900 dark:text-gray-100 ${
+                        u.activo === false ? 'opacity-55' : ''
+                      }`}
+                    >
+                      {u.nombre_completo}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-gray-500 dark:text-gray-400 ${
+                        u.activo === false ? 'opacity-55' : ''
+                      }`}
+                    >
+                      {u.correo}
+                    </td>
                     <td className="px-4 py-3">
                       <select
                         value={u.rol}
@@ -222,10 +283,28 @@ export default function UserManagement() {
                         {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </td>
+                    <td className="px-4 py-3">
+                      {u.activo === false ? (
+                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">
+                          Sin acceso
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">
+                          Activo
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => deleteUser(u.id, u.nombre_completo)}
-                        className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
-                        Eliminar
+                      <button
+                        onClick={() => cambiarAcceso(u)}
+                        disabled={updatingId === u.id}
+                        className={`text-xs disabled:opacity-50 ${
+                          u.activo === false
+                            ? 'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300'
+                            : 'text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+                        }`}
+                      >
+                        {u.activo === false ? 'Reactivar' : 'Desactivar acceso'}
                       </button>
                     </td>
                   </tr>

@@ -78,6 +78,7 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 8. supabase/migrations/reglas_cierre_asignado.sql
 9. supabase/migrations/search_path_handle_new_user.sql
 10. supabase/migrations/proteger_ultimo_administrador.sql
+11. supabase/migrations/desactivacion_de_usuarios.sql
 ```
 
 > `add_fecha_inicio.sql` reemplaza el trigger `trg_fecha_hecho` por `trg_marcas_de_tiempo`, que además sella cuándo una tarea entra a *En curso*. Sin esa marca solo se puede medir el tiempo total, que mezcla el tiempo que la tarea pasó esperando con el que costó hacerla.
@@ -198,6 +199,9 @@ npm run format:check  # Verifica formato sin escribir
 
   > `script-src` **no** lleva `unsafe-inline` — es la directiva que da todo el valor. `style-src` sí, porque las gráficas usan `style={{…}}` de React en once sitios; la alternativa (`style-src-attr`) deja los tooltips fuera de sitio en navegadores que no la entienden, y el riesgo no compensa cuando la revisión no encontró ningún vector de XSS.
 - **No se puede dejar el sistema sin Administrador**: `proteger_ultimo_administrador.sql` rechaza degradar o borrar al último (`PT006`). La salida, si no, sería el SQL Editor de Supabase — justo el conocimiento que esta aplicación existe para no exigirle a un refugio.
+- **El acceso se desactiva, no se borra**: el botón de la vista de Usuarios llama a `desactivar_usuario()`, que marca `activo = false` —lo que hace que `get_my_role()` devuelva nulo y **todas** las políticas denieguen, incluso a una sesión ya abierta— y además banea la cuenta en Auth, así que la credencial deja de servir. Dos capas, porque cada una tapa el hueco de la otra: la marca no impide autenticarse, el baneo no toca una sesión abierta.
+
+  > **Por qué desapareció el botón de eliminar.** Borraba la fila de `usuarios` y nada más: la cuenta de autenticación seguía viva, y —lo que nadie había visto— `tareas.asignado_id` tiene `on delete set null`, así que **desasignaba en silencio todas sus tareas, incluidas las ya cerradas**. En un sistema cuyo argumento es la trazabilidad, borrar quién cerró una tarea es peor que el problema de acceso. Si de verdad hay que eliminar a alguien, se hace desde el panel de Supabase, donde quien lo haga ve lo que está borrando.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
 
@@ -388,6 +392,7 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 8. supabase/migrations/reglas_cierre_asignado.sql
 9. supabase/migrations/search_path_handle_new_user.sql
 10. supabase/migrations/proteger_ultimo_administrador.sql
+11. supabase/migrations/desactivacion_de_usuarios.sql
 ```
 
 > `add_fecha_inicio.sql` replaces the `trg_fecha_hecho` trigger with `trg_marcas_de_tiempo`, which also stamps when a task enters *En curso*. Without that stamp only total time is measurable, which conflates waiting with working.
@@ -494,6 +499,7 @@ npm run format:check  # Check formatting without writing
 - **`search_path` pinned on every `SECURITY DEFINER` function** — the finding Supabase's Security Advisor reports as *Function Search Path Mutable*. The suite checks it, so it does not depend on remembering to open the dashboard.
 - **No raw error ever reaches the screen**: `src/lib/errores.js` translates Supabase and Postgres failures using an **allowlist, not a denylist** — only text we wrote is shown, anything unrecognized becomes a caller-supplied fallback. A denylist fails on the first message nobody anticipated, which is exactly when it matters. The login screen uses `mensajeDeLogin`, which collapses **every** account-state distinction, unexpected errors included: it is the only place the server answers someone not yet identified.
 - **The CSV cannot execute formulas**: values starting with `=`, `+`, `-` or `@` are prefixed with an apostrophe. CSV quoting is correct for the format but does not stop Excel from evaluating the cell, and this report is built to be opened on someone else's machine.
+- **Access is deactivated, not deleted**: the Users view calls `desactivar_usuario()`, which sets `activo = false` — making `get_my_role()` return null so every policy denies, even for an already-open session — and bans the account in Auth so the credential stops working. Two layers, because each covers the other's gap. The delete button is gone: it left the auth account alive and, worse, `tareas.asignado_id` has `on delete set null`, so it silently unassigned every task the person had closed.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
 
