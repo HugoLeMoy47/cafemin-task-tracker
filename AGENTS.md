@@ -41,6 +41,8 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   6. `storage_evidencias_privado.sql` — private bucket + ownership-scoped access
   7. `reglas_cierre_asignado.sql` — moves the task-closing rules out of the client (see below)
   8. `search_path_handle_new_user.sql` — pins the last mutable `search_path`
+  9. `proteger_ultimo_administrador.sql` — refuses to demote or delete the last admin (`PT006`)
+- `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
 - `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
 
@@ -172,6 +174,8 @@ npm run format        # Prettier
 - Schema changes go in `supabase/migrations/` as individual `.sql` files, and the README's ordered list is updated in the same commit — `supabase/tests/00_espejo.sql` executes that order, so a file missing from it is a file nobody tests.
 - Storage bucket changes (policies, new buckets) also go in `supabase/migrations/`.
 - **A change to a policy or trigger ships with its case in `supabase/tests/01_reglas_asignado.sql`** — and, when the change is a new restriction, with the normal-use case it could break. A security rule that gets in the way of daily work gets switched off, and then it protects nothing.
+- Adding an external host (a CDN, a font, an API) means adding it to the CSP in `build/cabeceras.js` in the same commit — otherwise it is blocked at runtime and only in production. Never add `unsafe-inline` to `script-src`; hash the script instead, the way the `index.html` one is handled.
+- Editing `index.html`'s inline script is fine — the hash is recomputed on every build. Removing it is not, without updating `build/cabeceras.js`.
 - Do not put free-text user input into the URL. `src/lib/enlaceReporte.js` deliberately omits the search field: catalog values are bounded, free text is not, and a URL outlives the reason it was shared.
 - When adding realtime subscriptions, always return a cleanup function: `return () => supabase.removeChannel(channel)`.
 - Never name a function `fetch` inside a component — it shadows the browser global. Use descriptive names like `fetchItems`, `fetchTasks`.
@@ -192,7 +196,7 @@ npm run format        # Prettier
 
 ## Notes for future agents
 
-- **A test suite exists**: Vitest, currently 171 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`, plus the SQL suite in `supabase/tests/`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
+- **A test suite exists**: Vitest, currently 190 tests across `src/lib/*.test.js` and `src/utils/validation.test.js`, plus the SQL suite in `supabase/tests/`. Run `npm test` before proposing a change; add cases for any logic you touch. There is no component-rendering suite — React Testing Library would be the next addition.
 - Three ESLint warnings are known and deliberate for now (`useEffect` deps in `CatalogManagement.jsx` and `KanbanBoard.jsx`, unused `userProfile` in `Reports.jsx`). Do not add new ones; treat any fourth warning as a regression.
 - Prettier has not been run across the whole repo yet. When it is, it goes in its own commit so it never hides a real change in the diff.
 - `TaskList.jsx` is no longer used in the main navigation flow (all roles now use `KanbanBoard`). It is kept for reference but can be removed if the codebase is cleaned up.

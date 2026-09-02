@@ -77,6 +77,7 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 7. supabase/migrations/storage_evidencias_privado.sql
 8. supabase/migrations/reglas_cierre_asignado.sql
 9. supabase/migrations/search_path_handle_new_user.sql
+10. supabase/migrations/proteger_ultimo_administrador.sql
 ```
 
 > `add_fecha_inicio.sql` reemplaza el trigger `trg_fecha_hecho` por `trg_marcas_de_tiempo`, que además sella cuándo una tarea entra a *En curso*. Sin esa marca solo se puede medir el tiempo total, que mezcla el tiempo que la tarea pasó esperando con el que costó hacerla.
@@ -191,6 +192,12 @@ npm run format:check  # Verifica formato sin escribir
 
   > El login usa `mensajeDeLogin`, que colapsa **cualquier** distinción entre estados de cuenta —incluido un error inesperado—. Es el único punto donde el servidor responde a alguien que todavía no se identificó, y una diferencia de texto entre «no existe» y «contraseña incorrecta» convierte la pantalla en un detector de correos registrados.
 - **El CSV no ejecuta fórmulas**: un valor que empiece por `=`, `+`, `-` o `@` se antepone con apóstrofo. El entrecomillado de CSV es correcto para el formato pero no impide que Excel evalúe la celda, y este reporte está hecho justamente para abrirse en la computadora de un tercero.
+- **Content-Security-Policy generada al construir**: `build/cabeceras.js` produce `dist/_headers`. No se puede escribir a mano porque necesita dos cosas que solo existen al construir: el origen de Supabase (una variable de entorno; escribirlo fijo ataría el archivo a un proyecto) y el **hash del script en línea de `index.html`**.
+
+  > Ese hash es la parte delicada. El script en línea marca si la página se abrió desde un enlace de recuperación de contraseña, y tiene que correr **antes** que el bundle. Una `script-src 'self'` a secas lo bloquea, y entonces quien sigue un enlace de recuperación entra a la aplicación normal sin cambiar nada: un agujero de seguridad silencioso introducido por una medida de seguridad. Por eso el plugin tira el build si no encuentra el script.
+
+  > `script-src` **no** lleva `unsafe-inline` — es la directiva que da todo el valor. `style-src` sí, porque las gráficas usan `style={{…}}` de React en once sitios; la alternativa (`style-src-attr`) deja los tooltips fuera de sitio en navegadores que no la entienden, y el riesgo no compensa cuando la revisión no encontró ningún vector de XSS.
+- **No se puede dejar el sistema sin Administrador**: `proteger_ultimo_administrador.sql` rechaza degradar o borrar al último (`PT006`). La salida, si no, sería el SQL Editor de Supabase — justo el conocimiento que esta aplicación existe para no exigirle a un refugio.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
 
@@ -380,6 +387,7 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 7. supabase/migrations/storage_evidencias_privado.sql
 8. supabase/migrations/reglas_cierre_asignado.sql
 9. supabase/migrations/search_path_handle_new_user.sql
+10. supabase/migrations/proteger_ultimo_administrador.sql
 ```
 
 > `add_fecha_inicio.sql` replaces the `trg_fecha_hecho` trigger with `trg_marcas_de_tiempo`, which also stamps when a task enters *En curso*. Without that stamp only total time is measurable, which conflates waiting with working.

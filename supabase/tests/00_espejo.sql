@@ -88,6 +88,7 @@ end $$;
 \ir ../migrations/storage_evidencias_privado.sql
 \ir ../migrations/reglas_cierre_asignado.sql
 \ir ../migrations/search_path_handle_new_user.sql
+\ir ../migrations/proteger_ultimo_administrador.sql
 
 
 -- ---------------------------------------------------------------------------

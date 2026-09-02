@@ -18,8 +18,23 @@ export default [
 
   js.configs.recommended,
 
+  /**
+   * Configuración y herramientas de build: corren en Node, no en el navegador.
+   * Sin esto, `process` y `fs` se reportan como variables sin declarar.
+   * Build tooling runs in Node, not the browser.
+   */
+  {
+    files: ['vite.config.js', 'eslint.config.js', 'build/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
+
   {
     files: ['**/*.{js,jsx}'],
+    ignores: ['vite.config.js', 'eslint.config.js', 'build/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',

@@ -208,6 +208,48 @@ select _contar('Control previo', 'El Administrador sí ve a todo el personal',
 
 
 -- ===========================================================================
+-- GRUPO 3b — La organización no se queda sin Administrador
+--
+-- El caso de "no se puede" es el obvio. El de "el penúltimo SÍ se puede" es el
+-- que suele faltar, y es el que separa una regla útil de un estorbo que
+-- alguien acabará desactivando.
+-- ===========================================================================
+set demo.uid = '11111111-1111-1111-1111-111111111111';   -- el único Administrador
+
+select _probar('Último Admin', 'No se puede degradar al último Administrador',
+  $$update usuarios set rol = 'Gestor'
+     where id = '11111111-1111-1111-1111-111111111111'$$, 'PT006');
+
+select _probar('Último Admin', 'No se puede borrar el perfil del último Administrador',
+  $$delete from usuarios
+     where id = '11111111-1111-1111-1111-111111111111'$$, 'PT006');
+
+-- Ahora hay dos. La regla debe dejar de estorbar.
+select _probar('Último Admin', 'Se puede nombrar a un segundo Administrador',
+  $$update usuarios set rol = 'Administrador'
+     where id = '33333333-3333-3333-3333-333333333333'$$, 'OK');
+
+select _probar('Último Admin', 'Con dos, sí se puede degradar a uno',
+  $$update usuarios set rol = 'Gestor'
+     where id = '11111111-1111-1111-1111-111111111111'$$, 'OK');
+
+-- Y con uno solo otra vez, vuelve a proteger.
+set demo.uid = '33333333-3333-3333-3333-333333333333';   -- el que quedó
+select _probar('Último Admin', 'Vuelve a proteger cuando queda uno solo',
+  $$update usuarios set rol = 'Asignado'
+     where id = '33333333-3333-3333-3333-333333333333'$$, 'PT006');
+
+-- Cambiar otra cosa de un Administrador no debe activar la regla.
+select _probar('Último Admin', 'Editar otro campo del Administrador no estorba',
+  $$update usuarios set nombre_completo = 'Nombre Nuevo'
+     where id = '33333333-3333-3333-3333-333333333333'$$, 'OK');
+
+-- Se restaura el estado para no arrastrar efectos al grupo siguiente.
+update usuarios set rol = 'Administrador'
+ where id = '11111111-1111-1111-1111-111111111111';
+
+
+-- ===========================================================================
 -- GRUPO 4 — Higiene de las funciones SECURITY DEFINER
 --
 -- El Security Advisor de Supabase marca "Function Search Path Mutable". Se

@@ -174,7 +174,15 @@ export default function App() {
             onNew={isAdmin || isGestor ? handleNew : undefined}
           />
         )}
-        {currentView === 'form' && (
+        {/* La guarda va aquí, junto a la vista, como en las otras cuatro.
+            Antes solo existía en el cableado: 'form' se alcanzaba únicamente a
+            través de handleEdit/handleNew, que solo se pasan a KanbanBoard
+            cuando el rol es privilegiado. Funcionaba, pero una condición que
+            vive en otro archivo es la que se pierde en el siguiente cambio.
+            The guard used to live only in the prop wiring — which worked, but a
+            condition that lives in another file is the one lost in the next
+            refactor. */}
+        {currentView === 'form' && (isAdmin || isGestor) && (
           <TaskForm
             task={editingTask}
             userProfile={userProfile}
