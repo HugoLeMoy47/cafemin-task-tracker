@@ -16,6 +16,7 @@ import ListaMovil from './ListaMovil'
 import EvidenceLink from './EvidenceLink'
 import ProgresoVoluntario from './ProgresoVoluntario'
 import CelebracionVictoria from './CelebracionVictoria'
+import ModalAsignarPlantilla from './ModalAsignarPlantilla'
 import { mensajeDeError } from '../lib/errores'
 import { obtenerMensajeVictoria } from '../lib/gamificacion'
 
@@ -283,6 +284,8 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const [dragError, setDragError] = useState('')
   const [moviendo, setMoviendo] = useState(null)
   const [celebracion, setCelebracion] = useState(null)
+  const [mostrarAsignarPlantilla, setMostrarAsignarPlantilla] = useState(false)
+  const [toastExito, setToastExito] = useState('')
 
   /**
    * Columna visible en el teléfono. Arranca SIEMPRE en 'Pendiente', aunque esté
@@ -422,15 +425,28 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
             {isPrivileged ? 'Todas las Tareas' : 'Mis Tareas'}
           </h2>
+          <div className="flex items-center gap-2">
+          {isPrivileged && (
+            <button
+              type="button"
+              onClick={() => setMostrarAsignarPlantilla(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              title="Asignar tareas de un perfil predefinido a un voluntario"
+            >
+              <span>⚡</span>
+              <span>Asignar rutina</span>
+            </button>
+          )}
           {isPrivileged && onNew && (
             <button
               onClick={onNew}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors"
             >
               + Nueva tarea
             </button>
           )}
         </div>
+      </div>
         {!isPrivileged ? (
           <div className="text-center py-16 px-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
             <span className="text-4xl mb-3 inline-block select-none" role="img" aria-label="Descanso">
@@ -458,11 +474,22 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
           {isPrivileged ? 'Todas las Tareas' : 'Mis Tareas'}
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {isPrivileged && (
+            <button
+              type="button"
+              onClick={() => setMostrarAsignarPlantilla(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+              title="Asignar tareas de un perfil predefinido a un voluntario"
+            >
+              <span>⚡</span>
+              <span>Asignar rutina</span>
+            </button>
+          )}
           {isPrivileged && onNew && (
             <button
               onClick={onNew}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors"
             >
               + Nueva tarea
             </button>
@@ -482,6 +509,22 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           tareas={tasks}
           nombreUsuario={userProfile?.nombre_completo}
         />
+      )}
+
+      {toastExito && (
+        <div className="mb-4 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-xl text-xs sm:text-sm flex items-center justify-between gap-2 shadow-xs animate-fade-in">
+          <span className="flex items-center gap-2 font-medium">
+            <span>✅</span>
+            <span>{toastExito}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setToastExito('')}
+            className="text-xs text-emerald-700 dark:text-emerald-300 hover:underline px-2 py-1 font-semibold"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {dragError && (
@@ -558,6 +601,17 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           mensaje={celebracion.mensaje}
           esUltima={celebracion.esUltima}
           onCerrar={() => setCelebracion(null)}
+        />
+      )}
+
+      {mostrarAsignarPlantilla && (
+        <ModalAsignarPlantilla
+          userProfile={userProfile}
+          onDone={() => setMostrarAsignarPlantilla(false)}
+          onSuccess={({ conteo, voluntario, perfil }) => {
+            setToastExito(`Se asignaron ${conteo} tareas del perfil "${perfil}" a ${voluntario}.`)
+            fetchTasks()
+          }}
         />
       )}
     </div>

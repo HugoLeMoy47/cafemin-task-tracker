@@ -29,10 +29,11 @@ export default function Navbar({ userProfile, currentView, setCurrentView, darkM
   }, [menuOpen])
 
   const navItems = [
-    { id: 'tasks',    label: 'Tareas',     show: true },
-    { id: 'reports',  label: 'Reportes',   show: isAdmin || isGestor },
-    { id: 'users',    label: 'Usuarios',   show: isAdmin },
-    { id: 'catalogs', label: 'Catálogos',  show: isAdmin },
+    { id: 'tasks',     label: 'Tareas',    show: true },
+    { id: 'templates', label: 'Rutinas',   show: isAdmin || isGestor },
+    { id: 'reports',   label: 'Reportes',  show: isAdmin || isGestor },
+    { id: 'users',     label: 'Usuarios',  show: isAdmin },
+    { id: 'catalogs',  label: 'Catálogos', show: isAdmin },
   ].filter((i) => i.show)
 
   function navigate(id) {

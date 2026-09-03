@@ -20,6 +20,9 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `csv.js` — CSV construction and download (`;` separator + UTF-8 BOM for Spanish Excel)
   - `flujoTareas.js` — the task state flow: `siguienteEstado`, `avanceDisponible`, `puedeMover`. Mirrors the database's `PT002`/`PT003` so the UI never offers a move the database will refuse
   - `evidencias.js` — evidence paths and signed URLs; imports the client lazily so the helpers stay testable without credentials
+  - `plantillas.js` — pure logic for routine task templates and profile preparation: ordering, payload mapping and validation
+  - `gamificacion.js` — volunteer progress metrics, shift milestone calculation and positive impact victory messages
+  - `confeti.js` — accessible, zero-dependency canvas confetti burst respecting `prefers-reduced-motion`
 - `src/hooks/useAnchoDeCaja.js` — an element's real pixel width via `ResizeObserver`; returns `null` before the first measurement, and callers must not guess a default (a guessed width renders one frame with the wrong layout and visibly jumps)
 - `src/hooks/usePantallaChica.js` — `matchMedia` at Tailwind's `sm:` breakdown (639 px) via `useSyncExternalStore`, so the value is right on the first render and a phone never flashes the desktop board
 - `src/components/` — feature components:
@@ -32,6 +35,10 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `TaskForm.jsx` — create/edit form with fields: nombre, detalles, asignado, categoría, área, fecha_limite, foto_requerida
   - `UserManagement.jsx` — user creation and role management (Admin only)
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
+  - `TemplateManagement.jsx` — CRUD for volunteer profiles and routine task templates (Admin and Gestor)
+  - `ModalAsignarPlantilla.jsx` — modal for batch-assigning routine task profiles to volunteers (Admin and Gestor)
+  - `ProgresoVoluntario.jsx` — daily shift progress bar and victory milestones for volunteers (Asignado)
+  - `CelebracionVictoria.jsx` — congratulatory modal with positive social impact messaging upon completing tasks
   - `ListaMovil.jsx` — the board below 640 px: one column at a time, tap-to-advance instead of drag. **Not a degraded mode** — see the README section on why the board's interaction model cannot survive a 360 px screen
   - `Reports.jsx` — reports container (Admin/Gestor only): four tabs, the global filter bar, per-tab sort, CSV export, and the URL state. **The only module that touches `window.history`.**
   - `components/reports/` — `Dashboard.jsx` (summary: KPIs, flow board, wait vs. work, recurring tasks, load), `graficas.jsx` (per-tab charts — components only, so React fast-refresh works), `base.jsx` (drawing primitives **and `fmtDias`**, which lives here so the desktop SVG and the mobile HTML cannot format a duration differently), `FlujoVertical.jsx` (the flow in HTML below 640 px — the SVG's labels land at 4 real px), `BarraFiltros.jsx` (collapses below 640 px), `EncabezadoOrdenable.jsx`, `CollapsibleGroup.jsx`
@@ -47,14 +54,15 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   8. `search_path_handle_new_user.sql` — pins the last mutable `search_path`
   9. `proteger_ultimo_administrador.sql` — refuses to demote or delete the last admin (`PT006`)
   10. `desactivacion_de_usuarios.sql` — `activo` flag, `desactivar_usuario()` / `reactivar_usuario()`, and removal of the DELETE policy on `usuarios`
+  11. `plantillas_perfil.sql` — routine task templates (`plantillas_perfil`, `plantilla_tareas`) and RLS policies for Admin/Gestor
 - `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
 - `pruebas/movil.mjs` — the small-screen regression test (`npm run test:movil`). Needs `npm run build:movil` first.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
-- `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
+- `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql`, `03_plantillas_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` and profile ids prefixed `cafepro0-` so a reset never touches live data
 
 ## Database schema
 
-Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`
+Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`, `plantillas_perfil`, `plantilla_tareas`
 
 Key behaviors:
 - `trg_marcas_de_tiempo` (from `add_fecha_inicio.sql`, replacing the older `trg_fecha_hecho`) stamps `fecha_hecho` on transitions to/from `'Hecho'` **and** `fecha_inicio` when a task first enters `'En curso'`. Without the start stamp only total elapsed time is measurable, which conflates waiting with working — the summary tab depends on this.
@@ -94,6 +102,7 @@ Navigation is state-based (`currentView` in `App.jsx`). There is no React Router
 | `currentView` | Component | Roles |
 |---------------|-----------|-------|
 | `tasks` | `KanbanBoard` | Todos (comportamiento varía según rol) |
+| `templates` | `TemplateManagement` | Administrador, Gestor |
 | `form` | `TaskForm` | Administrador, Gestor |
 | `reports` | `Reports` | Administrador, Gestor |
 | `users` | `UserManagement` | Administrador |

@@ -125,6 +125,10 @@ src/
 │   ├── EvidenceLink.jsx       # Abre una evidencia pidiendo su URL firmada
 │   ├── UserManagement.jsx     # Alta y gestión de usuarios (solo Admin)
 │   ├── CatalogManagement.jsx  # CRUD de catálogos con edición inline (solo Admin)
+│   ├── TemplateManagement.jsx # Gestión de perfiles y rutinas de tareas (Admin y Gestor)
+│   ├── ModalAsignarPlantilla.jsx # Modal para asignar perfiles rutinarios a voluntarios
+│   ├── ProgresoVoluntario.jsx # Barra de progreso y sentido de logro diario (Asignado)
+│   ├── CelebracionVictoria.jsx# Modal de celebración con mensaje de impacto social
 │   ├── ListaMovil.jsx         # El tablero por debajo de 640 px: una columna, avance por botón
 │   ├── Reports.jsx            # Contenedor de reportes: pestañas, filtros y estado en la URL
 │   └── reports/
@@ -141,7 +145,10 @@ src/
 │   ├── errores.js             # Traductor de errores de Supabase (lista blanca)
 │   ├── flujoTareas.js         # Flujo de estados: qué avance se ofrece y a quién
 │   ├── csv.js                 # Construcción y descarga del CSV
-│   └── evidencias.js          # Rutas de evidencia y URLs firmadas
+│   ├── evidencias.js          # Rutas de evidencia y URLs firmadas
+│   ├── plantillas.js          # Preparación y validación de tareas de rutinas/perfiles
+│   ├── gamificacion.js        # Progreso de jornada y mensajes cálidos de impacto
+│   └── confeti.js             # Ráfaga sutil de confeti nativo (accesible)
 ├── hooks/
 │   ├── usePantallaChica.js    # matchMedia al corte `sm:`, leído en el primer render
 │   └── useAnchoDeCaja.js      # Ancho real vía ResizeObserver: sin él el SVG escala su texto
@@ -159,10 +166,16 @@ supabase/
 │   ├── security_rls_and_stability.sql     # WITH CHECK Asignado + trigger de columnas
 │   ├── add_fecha_inicio.sql               # Marca de entrada a «En curso» (trg_marcas_de_tiempo)
 │   ├── hardening_rls_demo_publica.sql     # Cierre de políticas para exposición pública
-│   └── storage_evidencias_privado.sql     # Bucket privado + acceso por propiedad de la tarea
+│   ├── storage_evidencias_privado.sql     # Bucket privado + acceso por propiedad de la tarea
+│   ├── reglas_cierre_asignado.sql         # Reglas de cierre en base de datos (PT002-PT005)
+│   ├── search_path_handle_new_user.sql    # search_path fijo en handle_new_user
+│   ├── proteger_ultimo_administrador.sql  # Protección del último administrador activo
+│   ├── desactivacion_de_usuarios.sql      # Desactivación segura de usuarios
+│   └── plantillas_perfil.sql              # Tablas y RLS de perfiles y rutinas para Gestor/Admin
 └── seeds/
     ├── 01_cuentas_demo.sql    # Roles de las seis cuentas ficticias
-    └── 02_datos_demo.sql      # 90 tareas con fechas relativas a now()
+    ├── 02_datos_demo.sql      # 90 tareas con fechas relativas a now()
+    └── 03_plantillas_demo.sql # Perfiles y rutinas de tareas típicas de CAFEMIN
 ```
 
 Cada archivo de `src/lib/` tiene su `.test.js` al lado. Ahí vive la lógica que se puede
@@ -539,6 +552,10 @@ src/
 │   ├── EvidenceLink.jsx       # Opens an evidence photo via a freshly signed URL
 │   ├── UserManagement.jsx     # User creation and management (Admin only)
 │   ├── CatalogManagement.jsx  # Catalog CRUD with inline editing (Admin only)
+│   ├── TemplateManagement.jsx # Routine task profiles and templates CRUD (Admin & Gestor)
+│   ├── ModalAsignarPlantilla.jsx # Modal to batch-assign routine profiles to volunteers
+│   ├── ProgresoVoluntario.jsx # Volunteer daily shift progress bar and milestones (Asignado)
+│   ├── CelebracionVictoria.jsx# Victory celebration modal with social impact messages
 │   ├── ListaMovil.jsx         # The board below 640 px: one column, tap to advance
 │   ├── Reports.jsx            # Reports container: tabs, filters and URL state
 │   └── reports/
@@ -555,7 +572,10 @@ src/
 │   ├── errores.js             # Supabase error translator (allowlist)
 │   ├── flujoTareas.js         # State flow: which move is offered, and to whom
 │   ├── csv.js                 # CSV construction and download
-│   └── evidencias.js          # Evidence paths and signed URLs
+│   ├── evidencias.js          # Evidence paths and signed URLs
+│   ├── plantillas.js          # Routine templates preparation, ordering and validation
+│   ├── gamificacion.js        # Volunteer shift progress & positive impact messages
+│   └── confeti.js             # Accessible, lightweight native canvas confetti burst
 ├── hooks/
 │   └── usePantallaChica.js    # matchMedia at the `sm:` breakpoint, read on first render
 └── utils/
@@ -572,10 +592,16 @@ supabase/
 │   ├── security_rls_and_stability.sql     # WITH CHECK for Asignado + column-lock trigger
 │   ├── add_fecha_inicio.sql               # "En curso" stamp (trg_marcas_de_tiempo)
 │   ├── hardening_rls_demo_publica.sql     # Policy hardening for public exposure
-│   └── storage_evidencias_privado.sql     # Private bucket + ownership-scoped access
+│   ├── storage_evidencias_privado.sql     # Private bucket + ownership-scoped access
+│   ├── reglas_cierre_asignado.sql         # DB-level task-closing rules (PT002-PT005)
+│   ├── search_path_handle_new_user.sql    # Pinned search_path on handle_new_user
+│   ├── proteger_ultimo_administrador.sql  # Protect last active administrator
+│   ├── desactivacion_de_usuarios.sql      # Safe account deactivation
+│   └── plantillas_perfil.sql              # Routine task profiles and templates with RLS
 └── seeds/
     ├── 01_cuentas_demo.sql    # Roles for the six fictitious accounts
-    └── 02_datos_demo.sql      # 90 tasks with dates relative to now()
+    ├── 02_datos_demo.sql      # 90 tasks with dates relative to now()
+    └── 03_plantillas_demo.sql # Typical CAFEMIN volunteer profiles and routine tasks
 ```
 
 Every file in `src/lib/` has its `.test.js` beside it. That is where the logic that can be
