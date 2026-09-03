@@ -14,9 +14,31 @@ import prettier from 'eslint-config-prettier'
  * Goal: catch real defects without fighting formatting — Prettier owns that.
  */
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'graphify-out/**', 'coverage/**'] },
+  // `dist-*` cubre las salidas de los arneses de verificación
+  // (`dist-movil`, etc.). Sin ellas, `npm run lint` reporta miles de errores
+  // sobre código minificado y deja de servir para nada.
+  // Without dist-*, `npm run lint` drowns in minified build output.
+  { ignores: ['dist/**', 'dist-*/**', 'node_modules/**', 'graphify-out/**', 'coverage/**'] },
 
   js.configs.recommended,
+
+  /**
+   * `pruebas/` corre en Node, pero las funciones que le pasa a Playwright
+   * —`medir()`— se serializan y se ejecutan DENTRO del navegador. Por eso
+   * necesita los dos juegos de globales a la vez: `console` y `process` por un
+   * lado, `document` y `getComputedStyle` por el otro.
+   *
+   * Test scripts run in Node, but the functions handed to Playwright execute
+   * inside the browser, so both global sets apply.
+   */
+  {
+    files: ['pruebas/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 
   /**
    * Configuración y herramientas de build: corren en Node, no en el navegador.
@@ -34,7 +56,7 @@ export default [
 
   {
     files: ['**/*.{js,jsx}'],
-    ignores: ['vite.config.js', 'eslint.config.js', 'build/**/*.js'],
+    ignores: ['vite.config.js', 'eslint.config.js', 'build/**/*.js', 'pruebas/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',

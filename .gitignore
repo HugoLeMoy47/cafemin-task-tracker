@@ -30,3 +30,6 @@ coverage/
 # Sistema operativo / OS files
 .DS_Store
 Thumbs.db
+dist-movil
+dist-harness
+dist-errores

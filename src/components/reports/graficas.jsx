@@ -1,5 +1,6 @@
 import { ESTADOS } from '../../lib/reportes'
 import { COLOR_ESTADO, textoPrimario, textoTenue, useTooltip } from './base'
+import { useAnchoDeCaja } from '../../hooks/useAnchoDeCaja'
 
 /**
  * Gráficas de los reportes, en SVG hecho a mano.
@@ -18,7 +19,28 @@ import { COLOR_ESTADO, textoPrimario, textoTenue, useTooltip } from './base'
  *   pantalla y para el tooltip nativo si el JS falla.
  *
  * No chart library on purpose. Text wears text tokens, never the series color.
+ *
+ * ── Las tres dibujan al ancho REAL, no a un lienzo fijo ──
+ *
+ * Un `viewBox` fijo con `class="w-full"` escala todo lo que hay dentro, texto
+ * incluido: en un Android de 360 px estas gráficas se pintaban a escala 0.42 y
+ * sus etiquetas de 13 px aterrizaban a 5.5 px reales — decorativas, no
+ * legibles. Por eso `useAnchoDeCaja` mide el hueco disponible y el `viewBox`
+ * se construye con ese número: escala 1, y 13 px son 13 px en cualquier
+ * teléfono.
+ *
+ * Eso abre la otra mitad del arreglo, que es la que de verdad importa: con el
+ * ancho real a la mano, cada gráfica puede REPARTIR el espacio distinto cuando
+ * hay poco —el nombre encima de su barra en vez de a un lado— en vez de
+ * limitarse a encoger. Encoger nunca hace legible nada.
+ *
+ * All three draw at their REAL width. A fixed viewBox scales its text down;
+ * knowing the real width also lets each chart re-lay-out when space is tight
+ * instead of merely shrinking.
  */
+
+/** Por debajo de esto, el nombre no cabe al lado de su barra. */
+export const ANGOSTO = 420
 
 export function Marco({ titulo, descripcion, children }) {
   return (
@@ -61,42 +83,59 @@ function SinDatos({ children = 'Sin datos para graficar.' }) {
 
 export function GraficaEstado({ datos }) {
   const { manejadores, nodo } = useTooltip()
+  const [ref, ancho] = useAnchoDeCaja()
   const total = datos.reduce((a, d) => a + d.conteo, 0)
   if (total === 0) return <Marco titulo="Tareas por estado"><SinDatos /></Marco>
 
-  const W = 600
+  const W = ancho ?? 0
+  const angosto = W < ANGOSTO
   const ALTO_FILA = 40
-  const GUTTER = 88 // columna de etiquetas
-  const RESERVA = 78 // espacio del valor y el porcentaje al final de la barra
-  const H = datos.length * ALTO_FILA + 12
+  // «Pendiente» y «En curso» necesitan ~78 px a 13 px de letra. En 254 px de
+  // ancho eso se come un tercio del dibujo, así que en pantalla chica la
+  // etiqueta se va encima de la barra y la fila crece.
+  const GUTTER = angosto ? 0 : 88
+  const RESERVA = angosto ? 56 : 78
+  const alturaFila = angosto ? ALTO_FILA + 18 : ALTO_FILA
+  const H = datos.length * alturaFila + 12
   const maximo = Math.max(...datos.map((d) => d.conteo), 1)
-  const anchoUtil = W - GUTTER - RESERVA
+  const anchoUtil = Math.max(W - GUTTER - RESERVA, 10)
 
   return (
     <Marco
       titulo="Tareas por estado"
       descripcion={`${total} tareas en total. La longitud de cada barra es proporcional al número de tareas.`}
     >
+      <div ref={ref}>
+      {W > 0 && (
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
+        width={W}
+        height={H}
+        className="h-auto max-w-full"
         role="img"
         aria-label={`Barras de tareas por estado: ${datos.map((d) => `${d.estado} ${d.conteo}`).join(', ')}.`}
       >
         {datos.map((d, i) => {
-          const y = i * ALTO_FILA + 6
+          const y = i * alturaFila + 6
+          // En angosto la etiqueta ocupa su propia línea; la barra baja 18 px.
+          const yBarra = y + (angosto ? 18 : 0)
           const ancho = Math.max((d.conteo / maximo) * anchoUtil, d.conteo > 0 ? 3 : 0)
           const pct = Math.round((d.conteo / total) * 100)
           return (
             <g key={d.estado}>
-              <text x={0} y={y + 20} className={`${textoPrimario} text-[13px]`} dominantBaseline="middle">
+              <text
+                x={0}
+                y={angosto ? y + 8 : y + 20}
+                className={`${textoPrimario} text-[13px]`}
+                dominantBaseline="middle"
+              >
                 {d.estado}
               </text>
               {/* Riel recesivo: da referencia de escala sin competir con el dato. */}
-              <rect x={GUTTER} y={y + 8} width={anchoUtil} height={24} rx={4} fill="var(--viz-rejilla)" opacity="0.5" />
+              <rect x={GUTTER} y={yBarra + 8} width={anchoUtil} height={24} rx={4} fill="var(--viz-rejilla)" opacity="0.5" />
               <rect
                 x={GUTTER}
-                y={y + 8}
+                y={yBarra + 8}
                 width={ancho}
                 height={24}
                 rx={4}
@@ -108,17 +147,19 @@ export function GraficaEstado({ datos }) {
               </rect>
               <text
                 x={GUTTER + ancho + 8}
-                y={y + 20}
+                y={yBarra + 20}
                 className={`${textoPrimario} text-[13px] font-semibold`}
                 dominantBaseline="middle"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {d.conteo}
               </text>
+              {/* text-xs = 12 px, el piso. Antes era 11 px, que escalado a 0.42
+                  daba 4.7 px reales: el porcentaje no se leía, se adivinaba. */}
               <text
                 x={GUTTER + ancho + 8 + String(d.conteo).length * 8 + 6}
-                y={y + 20}
-                className={`${textoTenue} text-[11px]`}
+                y={yBarra + 20}
+                className={`${textoTenue} text-xs`}
                 dominantBaseline="middle"
               >
                 {pct}%
@@ -127,6 +168,8 @@ export function GraficaEstado({ datos }) {
           )
         })}
       </svg>
+      )}
+      </div>
       {nodo}
     </Marco>
   )
@@ -138,15 +181,20 @@ export function GraficaEstado({ datos }) {
 
 export function GraficaAsignado({ datos }) {
   const { manejadores, nodo } = useTooltip()
+  const [ref, ancho] = useAnchoDeCaja()
   if (datos.length === 0) return <Marco titulo="Carga por persona"><SinDatos /></Marco>
 
-  const W = 600
-  const ALTO_FILA = 38
-  const GUTTER = 172
-  const RESERVA = 40
+  const W = ancho ?? 0
+  // La columna de nombres pide 172 px. En un teléfono de 360 el dibujo mide
+  // 294: dejaría 82 px de barra, menos que la etiqueta. Aquí no hay ajuste
+  // posible, el nombre tiene que ir arriba y la barra debajo, a todo lo ancho.
+  const angosto = W < ANGOSTO
+  const ALTO_FILA = angosto ? 56 : 38
+  const GUTTER = angosto ? 0 : 172
+  const RESERVA = angosto ? 34 : 40
   const H = datos.length * ALTO_FILA + 12
   const maximo = Math.max(...datos.map((d) => d.total), 1)
-  const anchoUtil = W - GUTTER - RESERVA
+  const anchoUtil = Math.max(W - GUTTER - RESERVA, 10)
 
   return (
     <Marco
@@ -154,14 +202,19 @@ export function GraficaAsignado({ datos }) {
       descripcion="Cada barra es el total de tareas de una persona, dividido por estado. Ordenadas de mayor a menor carga."
     >
       <Leyenda series={ESTADOS.map((e) => ({ etiqueta: e, color: COLOR_ESTADO[e] }))} />
+      <div ref={ref}>
+      {W > 0 && (
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
+        width={W}
+        height={H}
+        className="h-auto max-w-full"
         role="img"
         aria-label={`Barras apiladas de carga por persona: ${datos.map((d) => `${d.nombre} ${d.total}`).join(', ')}.`}
       >
         {datos.map((d, i) => {
           const y = i * ALTO_FILA + 6
+          const yBarra = y + (angosto ? 20 : 0)
           let x = GUTTER
           return (
             <g key={d.nombre}>
@@ -172,8 +225,17 @@ export function GraficaAsignado({ datos }) {
                   browser folds it into the element's box. */}
               <g>
                 <title>{d.nombre}</title>
-                <text x={0} y={y + 18} className={`${textoPrimario} text-[13px]`} dominantBaseline="middle">
-                  {d.nombre.length > 24 ? `${d.nombre.slice(0, 23)}…` : d.nombre}
+                {/* Con el nombre en su propia línea cabe entero: ya no hay que
+                    recortarlo a 24 caracteres y «Fernanda Quiroz Bello» deja de
+                    competir por el ancho con su propia barra.
+                    On its own line the name fits whole. */}
+                <text
+                  x={0}
+                  y={angosto ? y + 8 : y + 18}
+                  className={`${textoPrimario} text-[13px]`}
+                  dominantBaseline="middle"
+                >
+                  {!angosto && d.nombre.length > 24 ? `${d.nombre.slice(0, 23)}…` : d.nombre}
                 </text>
               </g>
               {ESTADOS.map((estado) => {
@@ -186,7 +248,7 @@ export function GraficaAsignado({ datos }) {
                   <rect
                     key={estado}
                     x={izq}
-                    y={y + 6}
+                    y={yBarra + 6}
                     // 2 px de separación entre segmentos: sin ella, dos colores
                     // contiguos se leen como una sola masa.
                     width={Math.max(ancho - 2, 1)}
@@ -202,7 +264,7 @@ export function GraficaAsignado({ datos }) {
               })}
               <text
                 x={GUTTER + (d.total / maximo) * anchoUtil + 8}
-                y={y + 18}
+                y={yBarra + 18}
                 className={`${textoPrimario} text-[13px] font-semibold`}
                 dominantBaseline="middle"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -213,6 +275,8 @@ export function GraficaAsignado({ datos }) {
           )
         })}
       </svg>
+      )}
+      </div>
       {nodo}
     </Marco>
   )
@@ -224,16 +288,18 @@ export function GraficaAsignado({ datos }) {
 
 export function GraficaSemanal({ datos }) {
   const { manejadores, nodo } = useTooltip()
+  const [ref, ancho] = useAnchoDeCaja()
   const hayAlgo = datos.some((d) => d.creadas > 0 || d.cerradas > 0)
   if (!hayAlgo) return <Marco titulo="Creadas contra cerradas, por semana"><SinDatos /></Marco>
 
-  const W = 620
+  const W = ancho ?? 0
+  const angosto = W < ANGOSTO
   const H = 220
-  const IZQ = 32
-  const DER = 12
+  const IZQ = angosto ? 26 : 32
+  const DER = angosto ? 16 : 12
   const ARR = 12
   const ABA = 34
-  const anchoUtil = W - IZQ - DER
+  const anchoUtil = Math.max(W - IZQ - DER, 10)
   const altoUtil = H - ARR - ABA
 
   const maximo = Math.max(...datos.flatMap((d) => [d.creadas, d.cerradas]), 1)
@@ -257,29 +323,42 @@ export function GraficaSemanal({ datos }) {
       descripcion="Si la línea de cerradas se queda por debajo de la de creadas semana tras semana, el pendiente crece. La última semana va en punteado porque aún no termina."
     >
       <Leyenda series={series} />
+      <div ref={ref}>
+      {W > 0 && (
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
+        width={W}
+        height={H}
+        className="h-auto max-w-full"
         role="img"
         aria-label={`Líneas de tareas creadas y cerradas por semana durante ${datos.length} semanas.`}
       >
         {marcasY.map((v) => (
           <g key={v}>
             <line x1={IZQ} x2={W - DER} y1={py(v)} y2={py(v)} stroke="var(--viz-rejilla)" strokeWidth="1" />
-            <text x={IZQ - 6} y={py(v)} textAnchor="end" dominantBaseline="middle" className={`${textoTenue} text-[10px]`}>
+            <text x={IZQ - 6} y={py(v)} textAnchor="end" dominantBaseline="middle" className={`${textoTenue} text-xs`}>
               {v}
             </text>
           </g>
         ))}
 
-        {datos.map((d, i) =>
-          // Una etiqueta de cada dos: con diez semanas, todas se encimarían.
-          i % 2 === datos.length % 2 ? (
-            <text key={d.clave} x={px(i)} y={H - 12} textAnchor="middle" className={`${textoTenue} text-[10px]`}>
+        {datos.map((d, i) => {
+          /* Cuántas etiquetas de fecha caben es cuestión de aritmética, no de
+             gusto: cada «12 sep» pide unos 46 px a 12 px de letra. Con diez
+             semanas en 254 px de ancho no caben ni la mitad, así que el paso
+             se calcula a partir del espacio real. Antes eran fijas «una de cada
+             dos» a 10 px, que a escala 0.41 daban 4.1 px: ilegibles Y encimadas.
+             How many date labels fit is arithmetic: ~46 px each at 12 px type. */
+          const paso = Math.max(1, Math.ceil((datos.length * 46) / anchoUtil))
+          // Se ancla al final para que la semana más reciente siempre lleve
+          // etiqueta: es la que se mira primero.
+          const mostrar = (datos.length - 1 - i) % paso === 0
+          return mostrar ? (
+            <text key={d.clave} x={px(i)} y={H - 12} textAnchor="middle" className={`${textoTenue} text-xs`}>
               {d.etiqueta}
             </text>
           ) : null
-        )}
+        })}
 
         {series.map(({ clave, color }) => (
           <g key={clave}>
@@ -328,6 +407,8 @@ export function GraficaSemanal({ datos }) {
           ))
         )}
       </svg>
+      )}
+      </div>
       {nodo}
     </Marco>
   )

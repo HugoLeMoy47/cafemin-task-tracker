@@ -20,6 +20,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `csv.js` — CSV construction and download (`;` separator + UTF-8 BOM for Spanish Excel)
   - `flujoTareas.js` — the task state flow: `siguienteEstado`, `avanceDisponible`, `puedeMover`. Mirrors the database's `PT002`/`PT003` so the UI never offers a move the database will refuse
   - `evidencias.js` — evidence paths and signed URLs; imports the client lazily so the helpers stay testable without credentials
+- `src/hooks/useAnchoDeCaja.js` — an element's real pixel width via `ResizeObserver`; returns `null` before the first measurement, and callers must not guess a default (a guessed width renders one frame with the wrong layout and visibly jumps)
 - `src/hooks/usePantallaChica.js` — `matchMedia` at Tailwind's `sm:` breakdown (639 px) via `useSyncExternalStore`, so the value is right on the first render and a phone never flashes the desktop board
 - `src/components/` — feature components:
   - `Login.jsx` — email/password login and password-reset request (self-registration is hidden when `VITE_DEMO_MODE` is on)
@@ -47,6 +48,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   9. `proteger_ultimo_administrador.sql` — refuses to demote or delete the last admin (`PT006`)
   10. `desactivacion_de_usuarios.sql` — `activo` flag, `desactivar_usuario()` / `reactivar_usuario()`, and removal of the DELETE policy on `usuarios`
 - `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
+- `pruebas/movil.mjs` — the small-screen regression test (`npm run test:movil`). Needs `npm run build:movil` first.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
 - `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` so a reset never touches tasks created live
 
@@ -125,6 +127,12 @@ Inside `reports`, the active tab, the filters and the sort are held in `Reports.
 - Forms use `grid-cols-1 sm:grid-cols-2` for two-column layout on wider screens.
 
 **Charts are the trap.** An SVG with a `viewBox` scales its text along with everything else, so a font size that reads fine on a desktop is not a font size on a phone — it is that number times the scale factor. `viewBox="0 0 600 …"` at 360 px renders at scale 0.49, so its 12 px labels are **5.9 real px**. Before adding or resizing chart text, compute `clientWidth / viewBox-width` and multiply. Where the labels carry the meaning, render HTML instead of SVG — that is why `reports/FlujoVertical.jsx` exists — which has the added benefit of honoring the reader's system font size. `GraficaEstado`, `GraficaAsignado` and `GraficaSemanal` have **not** been fixed and still measure 5.1–6.9 real px.
+
+**There is a regression test — run it.** `npm run build:movil && npm run test:movil` measures six things across login, the board and all four report tabs, at 320/360/412 px and at 360 px with the system font at 130%: document overflow, touch targets under 44 px, HTML text under 12 px, **SVG text under 12 REAL px**, content hidden behind an inner `overflow-x-auto`, and chart labels with no gap from their bar. It needs Playwright, which is deliberately not an app dependency; the script says so and exits cleanly if it is missing. Every one of those six checks exists because that exact defect shipped here at least once.
+
+**Charts must draw at their real width.** A `viewBox` with `w-full` scales its text down — that is check 4, and it is the one no code review can perform, because the number in the source (`13`) is correct and the factor it gets multiplied by is nowhere in the file. Use `useAnchoDeCaja` and build the `viewBox` from the measured width, then re-lay-out below `ANGOSTO` (420 px) by moving labels onto their own line. Do not widen a gutter to fit a label: area and category names are edited by admins from the Catalogs screen, so any fixed width is a bet that eventually loses — that is exactly how «Acompañamiento» ended up on top of its own bar.
+
+**Known and unfixed: the app breaks at 200% system font.** Reports overflow, the login heading escapes its box, chart labels collide — because chart labels are positioned with hardcoded pixel offsets (18, 20, 42) while text grows with the system setting. The test pins 130%, the everyday "large text" setting, which passes whole. Raising that number is a project (moving chart layout to relative units), not a tweak.
 
 **The harness cannot see the login screen.** `harnessMovil.jsx` stubs Supabase and starts already signed in, so `Login.jsx` and `UpdatePassword.jsx` — the two screens with no session, and the only ones *every* user touches — were never in any measurement. They were found at 42 px by reading the deployed site. Measure those two against `npm run build` output, not the harness. And build with `VITE_DEMO_MODE` unset when you do: the demo flag hides the sign-up links, so a production check cannot see them (that is how the two 20 px links there survived).
 

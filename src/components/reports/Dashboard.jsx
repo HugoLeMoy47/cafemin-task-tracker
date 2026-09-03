@@ -1,6 +1,7 @@
-import { Leyenda, Marco } from './graficas'
+import { ANGOSTO, Leyenda, Marco } from './graficas'
 import { COLOR_ESTADO, fmtDias, textoPrimario, textoTenue, useTooltip } from './base'
 import { usePantallaChica } from '../../hooks/usePantallaChica'
+import { useAnchoDeCaja } from '../../hooks/useAnchoDeCaja'
 import FlujoVertical from './FlujoVertical'
 import {
   cargaPorDimension,
@@ -208,6 +209,7 @@ function Flujo({ m }) {
  */
 function EsperaContraTrabajo({ filas }) {
   const { manejadores, nodo } = useTooltip()
+  const [ref, ancho] = useAnchoDeCaja()
   const medibles = filas.filter((f) => f.total !== null)
   if (medibles.length === 0) {
     return (
@@ -219,13 +221,18 @@ function EsperaContraTrabajo({ filas }) {
     )
   }
 
-  const W = 600
-  const ALTO_FILA = 38
-  const GUTTER = 172
-  const RESERVA = 56
+  // Mismo criterio que las gráficas de `graficas.jsx`: se dibuja al ancho real
+  // para que 13 px sean 13 px, y con poco espacio el nombre se va a su propia
+  // línea en vez de pelear con la barra por los mismos píxeles.
+  // Same rule as the charts in graficas.jsx: draw at the real width.
+  const W = ancho ?? 0
+  const angosto = W < ANGOSTO
+  const ALTO_FILA = angosto ? 56 : 38
+  const GUTTER = angosto ? 0 : 172
+  const RESERVA = angosto ? 50 : 56
   const H = medibles.length * ALTO_FILA + 12
   const maximo = Math.max(...medibles.map((f) => f.total), 0.1)
-  const anchoUtil = W - GUTTER - RESERVA
+  const anchoUtil = Math.max(W - GUTTER - RESERVA, 10)
 
   const series = [
     { clave: 'espera', etiqueta: 'Esperando que la tomen', color: 'var(--viz-pendiente)' },
@@ -238,17 +245,25 @@ function EsperaContraTrabajo({ filas }) {
       descripcion="El tiempo total puede ser parecido entre personas y aun así repartirse muy distinto. Lo primero apunta a cómo se asignan las tareas; lo segundo, a cómo se ejecutan."
     >
       <Leyenda series={series} />
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img"
+      <div ref={ref}>
+      {W > 0 && (
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="h-auto max-w-full" role="img"
         aria-label={`Tiempo medio por persona, dividido en espera y trabajo: ${medibles.map((f) => `${f.nombre}, ${fmtDias(f.espera)} de espera y ${fmtDias(f.trabajo)} de trabajo`).join('; ')}.`}>
         {medibles.map((f, i) => {
           const y = i * ALTO_FILA + 6
+          const yBarra = y + (angosto ? 20 : 0)
           let x = GUTTER
           return (
             <g key={f.nombre}>
               <g>
                 <title>{f.nombre}</title>
-                <text x={0} y={y + 18} className={`${textoPrimario} text-[13px]`} dominantBaseline="middle">
-                  {f.nombre.length > 24 ? `${f.nombre.slice(0, 23)}…` : f.nombre}
+                <text
+                  x={0}
+                  y={angosto ? y + 8 : y + 18}
+                  className={`${textoPrimario} text-[13px]`}
+                  dominantBaseline="middle"
+                >
+                  {!angosto && f.nombre.length > 24 ? `${f.nombre.slice(0, 23)}…` : f.nombre}
                 </text>
               </g>
               {series.map(({ clave, etiqueta, color }) => {
@@ -258,15 +273,15 @@ function EsperaContraTrabajo({ filas }) {
                 const izq = x
                 x += ancho
                 return (
-                  <rect key={clave} x={izq} y={y + 6} width={Math.max(ancho - 2, 1)} height={24} rx={2}
+                  <rect key={clave} x={izq} y={yBarra + 6} width={Math.max(ancho - 2, 1)} height={24} rx={2}
                     fill={color} tabIndex={0}
                     {...manejadores(`${f.nombre} · ${etiqueta}: ${fmtDias(v)}`)}>
                     <title>{`${f.nombre}, ${etiqueta}: ${fmtDias(v)}`}</title>
                   </rect>
                 )
               })}
-              <text x={GUTTER + (f.total / maximo) * anchoUtil + 8} y={y + 18}
-                className={`${textoPrimario} text-[12px] font-semibold`} dominantBaseline="middle"
+              <text x={GUTTER + (f.total / maximo) * anchoUtil + 8} y={yBarra + 18}
+                className={`${textoPrimario} text-xs font-semibold`} dominantBaseline="middle"
                 style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {fmtDias(f.total)}
               </text>
@@ -274,6 +289,8 @@ function EsperaContraTrabajo({ filas }) {
           )
         })}
       </svg>
+      )}
+      </div>
       {nodo}
       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
         Promedios sobre las tareas cerradas que tienen marca de inicio; ambas cifras salen del mismo conjunto, por eso su suma es un tiempo de ciclo real.{' '}
@@ -288,6 +305,7 @@ function EsperaContraTrabajo({ filas }) {
 /* ------------------------------------------------------------------ */
 
 function Recurrentes({ filas }) {
+  const esChica = usePantallaChica()
   if (filas.length === 0) {
     return (
       <Marco titulo="Tareas que se repiten">
@@ -305,6 +323,53 @@ function Recurrentes({ filas }) {
     >
       {/* Una tabla, no un gráfico: son tres medidas por fila y lo que se hace
           con ellas es leerlas y compararlas, no estimarlas de un vistazo. */}
+
+      {/* En un teléfono, fichas. La tabla pedía 420 px de ancho dentro de un
+          `overflow-x-auto`: a 320 px escondía 166 px —la columna «Promedio»
+          entera— y la página se veía perfecta, sin ninguna señal de que
+          faltara algo. Un scroll lateral que nadie ve es contenido perdido, no
+          contenido desplazado, y por eso `npm run test:movil` lo trata como un
+          fallo aunque el documento no desborde.
+
+          Encoger la tabla no era opción: cuatro columnas con nombres de tarea
+          largos no caben en 254 px a un tamaño legible. Así que cada fila pasa
+          a ser una ficha donde cada número lleva su etiqueta encima —que es lo
+          que la cabecera de la tabla hacía y aquí se perdería—.
+
+          On a phone, cards. The table needed 420 px inside an overflow-x-auto:
+          at 320 px it hid an entire column with no cue it existed. */}
+      {esChica ? (
+        <ul className="list-none p-0 m-0 divide-y divide-gray-100 dark:divide-gray-700/60">
+          {top.map((f) => (
+            <li key={f.nombre} className="py-3 first:pt-0">
+              <p className="text-sm text-gray-800 dark:text-gray-100">{f.nombre}</p>
+              {/* `flex-wrap` no es adorno: sin él, con la letra del sistema al
+                  200% —que en un refugio con gente de todas las edades es un
+                  ajuste normal, no un caso raro— las tres cifras no caben en
+                  una línea y «Promedio» se salía 76 px de la pantalla. Medido.
+                  Without flex-wrap, at 200% system font the third figure ran
+                  76 px off-screen. */}
+              <dl className="flex flex-wrap gap-x-5 gap-y-2 mt-1.5 m-0">
+                {[
+                  ['Veces', f.veces],
+                  ['Cerradas', f.cerradas],
+                  ['Promedio', fmtDias(f.totalMedio)],
+                ].map(([etiqueta, valor]) => (
+                  <div key={etiqueta}>
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">{etiqueta}</dt>
+                    <dd
+                      className="text-sm font-medium text-gray-700 dark:text-gray-200 m-0"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {valor}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[420px]">
           <thead className="border-b border-gray-100 dark:border-gray-700">
@@ -327,6 +392,7 @@ function Recurrentes({ filas }) {
           </tbody>
         </table>
       </div>
+      )}
       {filas.length > top.length && (
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
           Se muestran las {top.length} más frecuentes de {filas.length}.
@@ -338,27 +404,47 @@ function Recurrentes({ filas }) {
 
 function Carga({ titulo, descripcion, filas }) {
   const { manejadores, nodo } = useTooltip()
+  const [ref, ancho] = useAnchoDeCaja()
   if (filas.length === 0) return null
 
-  const W = 600
-  const ALTO_FILA = 30
-  const GUTTER = 130
-  const RESERVA = 40
+  // Primero se probó con un gutter reducido, apostando a que los nombres de
+  // área y categoría son cortos. A 320 px «Acompañamiento» se montó encima de
+  // su propia barra: 14 caracteres a 12 px piden ~105 px y el hueco eran 104.
+  // No lo detectó ninguna medición, se vio en una captura.
+  //
+  // Y el arreglo no es agrandar el gutter, porque estos nombres los escribe el
+  // administrador desde la vista de Catálogos: cualquier número fijo es una
+  // apuesta a que nadie escriba algo más largo, y tarde o temprano alguien lo
+  // escribe. Con poco ancho la etiqueta se va a su propia línea y entonces da
+  // igual cuánto mida.
+  //
+  // A reduced gutter collided with «Acompañamiento» at 320 px. Widening it
+  // would only move the bet: these names are user-editable from the Catalogs
+  // screen, so any fixed width eventually breaks. On its own line, length
+  // stops mattering.
+  const W = ancho ?? 0
+  const angosto = W < ANGOSTO
+  const ALTO_FILA = angosto ? 48 : 30
+  const GUTTER = angosto ? 0 : 130
+  const RESERVA = angosto ? 30 : 40
   const top = filas.slice(0, 10)
   const H = top.length * ALTO_FILA + 10
   const maximo = Math.max(...top.map((f) => f.total), 1)
-  const anchoUtil = W - GUTTER - RESERVA
+  const anchoUtil = Math.max(W - GUTTER - RESERVA, 10)
 
   return (
     <Marco titulo={titulo} descripcion={descripcion}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img"
+      <div ref={ref}>
+      {W > 0 && (
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="h-auto max-w-full" role="img"
         aria-label={`${titulo}: ${top.map((f) => `${f.nombre} ${f.total}`).join(', ')}.`}>
         {top.map((f, i) => {
           const y = i * ALTO_FILA + 4
+          const yBarra = y + (angosto ? 18 : 0)
           let x = GUTTER
           return (
             <g key={f.nombre}>
-              <text x={0} y={y + 14} className={`${textoPrimario} text-[12px]`} dominantBaseline="middle">
+              <text x={0} y={angosto ? y + 6 : y + 14} className={`${textoPrimario} text-xs`} dominantBaseline="middle">
                 {f.nombre.length > 18 ? `${f.nombre.slice(0, 17)}…` : f.nombre}
               </text>
               {['Pendiente', 'En curso', 'Hecho'].map((estado) => {
@@ -368,15 +454,15 @@ function Carga({ titulo, descripcion, filas }) {
                 const izq = x
                 x += ancho
                 return (
-                  <rect key={estado} x={izq} y={y + 3} width={Math.max(ancho - 2, 1)} height={20} rx={2}
+                  <rect key={estado} x={izq} y={yBarra + 3} width={Math.max(ancho - 2, 1)} height={20} rx={2}
                     fill={COLOR_ESTADO[estado]} tabIndex={0}
                     {...manejadores(`${f.nombre} · ${estado}: ${n}`)}>
                     <title>{`${f.nombre}, ${estado}: ${n}`}</title>
                   </rect>
                 )
               })}
-              <text x={GUTTER + (f.total / maximo) * anchoUtil + 8} y={y + 14}
-                className={`${textoPrimario} text-[12px] font-semibold`} dominantBaseline="middle"
+              <text x={GUTTER + (f.total / maximo) * anchoUtil + 8} y={yBarra + 14}
+                className={`${textoPrimario} text-xs font-semibold`} dominantBaseline="middle"
                 style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {f.total}
               </text>
@@ -384,6 +470,8 @@ function Carga({ titulo, descripcion, filas }) {
           )
         })}
       </svg>
+      )}
+      </div>
       {nodo}
     </Marco>
   )

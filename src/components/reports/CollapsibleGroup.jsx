@@ -32,7 +32,11 @@ export default function CollapsibleGroup({
         onClick={onAlternar}
         aria-expanded={abierto}
         aria-controls={idPanel}
-        className="w-full flex items-center gap-2 mb-2 text-left rounded-lg px-1 py-1 hover:bg-gray-50 dark:hover:bg-gray-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        /* `min-h-[44px]`: es el control que abre y cierra cada grupo, o sea el
+           único camino a las filas. Salía a 32 px. Lo encontró
+           `npm run test:movil`, no una revisión del código.
+           This is the only path to the rows; it measured 32 px. */
+        className="w-full flex items-center gap-2 mb-2 text-left rounded-lg px-1 py-1 min-h-[44px] hover:bg-gray-50 dark:hover:bg-gray-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         <span
           aria-hidden="true"

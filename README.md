@@ -143,9 +143,13 @@ src/
 │   ├── csv.js                 # Construcción y descarga del CSV
 │   └── evidencias.js          # Rutas de evidencia y URLs firmadas
 ├── hooks/
-│   └── usePantallaChica.js    # matchMedia al corte `sm:`, leído en el primer render
+│   ├── usePantallaChica.js    # matchMedia al corte `sm:`, leído en el primer render
+│   └── useAnchoDeCaja.js      # Ancho real vía ResizeObserver: sin él el SVG escala su texto
 └── utils/
     └── validation.js          # Helpers: validación de email, contraseña, tarea e imagen
+
+pruebas/
+└── movil.mjs                  # Regresión de pantalla chica (npm run test:movil)
 
 supabase/
 ├── schema.sql                 # Tablas, triggers, RLS y datos iniciales
@@ -178,6 +182,8 @@ npm run lint          # ESLint
 npm run lint:fix      # ESLint con correcciones automáticas
 npm run format        # Formatea con Prettier
 npm run format:check  # Verifica formato sin escribir
+npm run build:movil   # Arnés para la prueba de pantalla chica
+npm run test:movil    # Regresión en 320/360/412 px y con letra al 130% (necesita Playwright)
 ```
 
 ### 🔒 Seguridad
@@ -297,7 +303,34 @@ Y hay un detalle que solo aparece midiendo la build local: con `VITE_DEMO_MODE=t
 | Objetivos táctiles < 44 px | 3 de 5 (y 2 más ocultos por la bandera de demo) | **0 de 5** |
 | Desborde horizontal | 0 px | 0 px |
 
-**Lo que sigue abierto, medido y sin arreglar:** las tres gráficas de las pestañas (`GraficaEstado`, `GraficaAsignado`, `GraficaSemanal`) siguen siendo SVG con `viewBox` de 600 px. Su texto cae a **5.1 px a 320, 5.9 px a 360 y 6.9 px a 412**. Se ve en la captura: los nombres de las barras son manchas. No se tocaron en esta ronda. Y la tabla «Tareas que se repiten» tiene `min-w-[420px]`: a 320 px esconde 166 px por scroll lateral, incluida la columna «Promedio», sin ninguna señal de que haya más. Ambas cosas son trabajo pendiente, no cosas que ya funcionen.
+### 📱 Las gráficas, y la prueba que las cazó
+
+El error de fondo era uno solo, y estaba en las cinco gráficas: **`viewBox` fijo con `w-full`**. Un `<svg viewBox="0 0 600 160" class="w-full">` no dibuja a 600 px, dibuja a lo ancho que le toque y escala todo lo que hay dentro, el texto incluido. En un Android de 360 se pintaba a 294 px —escala 0.49— y una etiqueta declarada de 13 px aterrizaba a **6.4 px reales**.
+
+Lo importante de ese error es que **es invisible leyendo el código**. El número está ahí, dice 13, y es correcto; lo que no está en el código es el factor por el que se multiplica. Por eso sobrevivió a tres rondas de trabajo en móvil.
+
+El arreglo es `src/hooks/useAnchoDeCaja.js`: se mide el hueco real y el `viewBox` se construye con ese número, así que la escala es 1 y 13 px son 13 px. Y eso abre la mitad que de verdad importa — con el ancho real a la mano, cada gráfica **reparte** el espacio distinto cuando hay poco: por debajo de 420 px el nombre se va encima de su barra en vez de pelear con ella por los mismos píxeles. Encoger no hace legible nada.
+
+La tabla «Tareas que se repiten» no se encogió: por debajo de 640 px se vuelve una lista de fichas donde cada número lleva su etiqueta, porque cuatro columnas con nombres de tarea largos no caben en 254 px a un tamaño que se lea.
+
+**`npm run test:movil`** es lo que hace que nada de esto se pierda. Levanta el arnés, monta los componentes reales con datos simulados y mide seis cosas en cada vista y cada escenario:
+
+| # | Comprobación | El defecto real que la motivó |
+|---|---|---|
+| 1 | La página no se sale de la pantalla | El tablero pedía 692 px en 360 |
+| 2 | Nada interactivo por debajo de 44 px | Once objetivos, y los del login a 42 px |
+| 3 | Texto HTML de 12 px para arriba | Cabeceras de tabla a 10 px |
+| 4 | **Texto de SVG en píxeles REALES** (tamaño × escala) | Las cinco gráficas, a 4.1–7.5 px |
+| 5 | Nada escondido tras scroll lateral interno | «Por Fecha» invisible; la tabla ocultando 166 px |
+| 6 | Las etiquetas no se pegan a su barra | «Acompañamiento» montado sobre la suya |
+
+Cubre login *sin sesión*, el tablero y las cuatro pestañas de reportes, en 320, 360, 412 px y a 360 px con la letra del sistema al 130%. **24 comprobaciones.**
+
+Vale la pena decir cómo se comportó: en su primera corrida encontró **dos defectos que no estaban en la lista** —las cabeceras colapsables a 32 px y texto de tabla a 10 px— y su comprobación 6 nació de un fallo que la propia prueba no vio y sí se vio en una captura. Cuando se calibró contra ese caso real, resultó que el solape era de **1.6 px**: cualquier chequeo de «¿se enciman?» lo habría dejado pasar. Por eso exige un hueco mínimo en vez de castigar la intersección.
+
+> Correr `npm run test:movil` necesita Playwright, que **no** es dependencia de la aplicación. Si falta, la prueba lo dice y explica cómo instalarlo; nunca revienta con un error de módulo. Primero `npm run build:movil`.
+
+**Lo que sigue abierto, medido y sin arreglar:** con la letra del sistema al **200%** —el máximo de accesibilidad de Android— la aplicación no aguanta: los reportes desbordan, «CAFEMIN» se sale de su caja en el login y las etiquetas de las gráficas se montan. La causa es que las gráficas colocan sus etiquetas con desplazamientos fijos en píxeles (18, 20, 42) mientras el texto crece con el ajuste del sistema. Arreglarlo es pasar la maquetación de las gráficas a unidades relativas — un trabajo aparte, no un ajuste. La prueba fija **130%**, que es el «texto grande» de uso corriente y que sí pasa entero; ese número es una decisión sobre qué se garantiza, no un arreglo del 200%.
 
 ---
 
@@ -527,6 +560,9 @@ src/
 │   └── usePantallaChica.js    # matchMedia at the `sm:` breakpoint, read on first render
 └── utils/
     └── validation.js          # Helpers: email, password, task and image validation
+
+pruebas/
+└── movil.mjs                  # Small-screen regression test (npm run test:movil)
 
 supabase/
 ├── schema.sql                 # Tables, triggers, RLS policies and seed data
