@@ -22,6 +22,7 @@ falla, así que también sirve tal cual en un pipeline.
 |---|---|
 | `00_espejo.sql` | Levanta el espejo. Simula `auth.uid()` y los objetos mínimos de `storage`, y luego **ejecuta los archivos de migración reales** en el orden documentado. |
 | `01_reglas_asignado.sql` | 48 casos: los ataques que deben rebotar, el uso normal que no debe romperse, los controles previos que deben seguir aguantando, y la higiene de las funciones `SECURITY DEFINER`. |
+| `estado_de_migraciones.sql` | Consulta de solo lectura para correr contra el proyecto **real** de Supabase: dice cuál de las cuatro migraciones de endurecimiento está aplicada y cuál falta. Supabase no guarda registro de qué archivo se ejecutó, así que pregunta por el objeto que cada migración crea. |
 
 El espejo corre los archivos reales con `\ir`, no una copia de su contenido.
 Es deliberado: una copia se desincroniza y entonces la suite pasa mientras el
