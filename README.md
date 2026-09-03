@@ -127,6 +127,9 @@ src/
 │   ├── CatalogManagement.jsx  # CRUD de catálogos con edición inline (solo Admin)
 │   ├── TemplateManagement.jsx # Gestión de perfiles y rutinas de tareas (Admin y Gestor)
 │   ├── ModalAsignarPlantilla.jsx # Modal para asignar perfiles rutinarios a voluntarios
+│   ├── ModalIniciarTurno.jsx  # Modal de auto-inicio de turno de voluntariado (Asignado)
+│   ├── PoolTareasAbiertas.jsx # Cajón desplegable para tomar tareas abiertas del albergue
+│   ├── BitacoraTurno.jsx      # Bitácora y notas de entrega de turno (todos los roles)
 │   ├── ProgresoVoluntario.jsx # Barra de progreso y sentido de logro diario (Asignado)
 │   ├── CelebracionVictoria.jsx# Modal de celebración con mensaje de impacto social
 │   ├── ListaMovil.jsx         # El tablero por debajo de 640 px: una columna, avance por botón
@@ -171,7 +174,8 @@ supabase/
 │   ├── search_path_handle_new_user.sql    # search_path fijo en handle_new_user
 │   ├── proteger_ultimo_administrador.sql  # Protección del último administrador activo
 │   ├── desactivacion_de_usuarios.sql      # Desactivación segura de usuarios
-│   └── plantillas_perfil.sql              # Tablas y RLS de perfiles y rutinas para Gestor/Admin
+│   ├── plantillas_perfil.sql              # Tablas y RLS de perfiles y rutinas para Gestor/Admin
+│   └── autonomia_y_bitacora_turno.sql     # Check-in voluntario, pool de tareas abiertas y bitácora
 └── seeds/
     ├── 01_cuentas_demo.sql    # Roles de las seis cuentas ficticias
     ├── 02_datos_demo.sql      # 90 tareas con fechas relativas a now()
@@ -554,6 +558,9 @@ src/
 │   ├── CatalogManagement.jsx  # Catalog CRUD with inline editing (Admin only)
 │   ├── TemplateManagement.jsx # Routine task profiles and templates CRUD (Admin & Gestor)
 │   ├── ModalAsignarPlantilla.jsx # Modal to batch-assign routine profiles to volunteers
+│   ├── ModalIniciarTurno.jsx  # Volunteer self-check-in modal for daily routine profile (Asignado)
+│   ├── PoolTareasAbiertas.jsx # Collapsible drawer for volunteers to claim open shelter tasks
+│   ├── BitacoraTurno.jsx      # Shift handover notes and operational observations (All roles)
 │   ├── ProgresoVoluntario.jsx # Volunteer daily shift progress bar and milestones (Asignado)
 │   ├── CelebracionVictoria.jsx# Victory celebration modal with social impact messages
 │   ├── ListaMovil.jsx         # The board below 640 px: one column, tap to advance
@@ -597,7 +604,8 @@ supabase/
 │   ├── search_path_handle_new_user.sql    # Pinned search_path on handle_new_user
 │   ├── proteger_ultimo_administrador.sql  # Protect last active administrator
 │   ├── desactivacion_de_usuarios.sql      # Safe account deactivation
-│   └── plantillas_perfil.sql              # Routine task profiles and templates with RLS
+│   ├── plantillas_perfil.sql              # Routine task profiles and templates with RLS
+│   └── autonomia_y_bitacora_turno.sql     # Volunteer self-check-in, open task pool, and handover log
 └── seeds/
     ├── 01_cuentas_demo.sql    # Roles for the six fictitious accounts
     ├── 02_datos_demo.sql      # 90 tasks with dates relative to now()

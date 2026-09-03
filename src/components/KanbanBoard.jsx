@@ -17,6 +17,9 @@ import EvidenceLink from './EvidenceLink'
 import ProgresoVoluntario from './ProgresoVoluntario'
 import CelebracionVictoria from './CelebracionVictoria'
 import ModalAsignarPlantilla from './ModalAsignarPlantilla'
+import ModalIniciarTurno from './ModalIniciarTurno'
+import PoolTareasAbiertas from './PoolTareasAbiertas'
+import BitacoraTurno from './BitacoraTurno'
 import { mensajeDeError } from '../lib/errores'
 import { obtenerMensajeVictoria } from '../lib/gamificacion'
 
@@ -285,6 +288,8 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const [moviendo, setMoviendo] = useState(null)
   const [celebracion, setCelebracion] = useState(null)
   const [mostrarAsignarPlantilla, setMostrarAsignarPlantilla] = useState(false)
+  const [mostrarIniciarTurno, setMostrarIniciarTurno] = useState(false)
+  const [mostrarBitacora, setMostrarBitacora] = useState(false)
   const [toastExito, setToastExito] = useState('')
 
   /**
@@ -456,12 +461,36 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
               ¡Todo en orden por ahora!
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
-              No tienes tareas asignadas por el momento. Muchas gracias por acompañar y apoyar la labor comunitaria en CAFEMIN.
+              No tienes tareas asignadas por el momento. Puedes iniciar una jornada o tomar tareas abiertas disponibles.
             </p>
+            <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setMostrarIniciarTurno(true)}
+                className="min-h-[44px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-colors inline-flex items-center gap-2"
+              >
+                <span>🚀</span>
+                <span>Comenzar mi turno</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarBitacora(true)}
+                className="min-h-[44px] px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold text-xs transition-colors inline-flex items-center gap-1.5"
+              >
+                <span>📝</span>
+                <span>Bitácora de novedades</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">
             No hay tareas aún.
+          </div>
+        )}
+
+        {!isPrivileged && (
+          <div className="mt-6">
+            <PoolTareasAbiertas onTareaTomada={fetchTasks} />
           </div>
         )}
       </div>
@@ -475,29 +504,57 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           {isPrivileged ? 'Todas las Tareas' : 'Mis Tareas'}
         </h2>
         <div className="flex items-center gap-2 sm:gap-3">
-          {isPrivileged && (
-            <button
-              type="button"
-              onClick={() => setMostrarAsignarPlantilla(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
-              title="Asignar tareas de un perfil predefinido a un voluntario"
-            >
-              <span>⚡</span>
-              <span>Asignar rutina</span>
-            </button>
+          {isPrivileged ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setMostrarAsignarPlantilla(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                title="Asignar tareas de un perfil predefinido a un voluntario"
+              >
+                <span>⚡</span>
+                <span>Asignar rutina</span>
+              </button>
+              {onNew && (
+                <button
+                  onClick={onNew}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors"
+                >
+                  + Nueva tarea
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setMostrarBitacora(true)}
+                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                title="Ver y registrar notas de entrega de turno"
+              >
+                <span>📝</span>
+                <span className="hidden sm:inline">Bitácora</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setMostrarIniciarTurno(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                title="Comenzar jornada seleccionando un perfil de tareas"
+              >
+                <span>🚀</span>
+                <span>Iniciar turno</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarBitacora(true)}
+                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                title="Ver y registrar notas de entrega de turno"
+              >
+                <span>📝</span>
+                <span className="hidden sm:inline">Bitácora</span>
+              </button>
+            </>
           )}
-          {isPrivileged && onNew && (
-            <button
-              onClick={onNew}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg transition-colors"
-            >
-              + Nueva tarea
-            </button>
-          )}
-          {/* La pista de arrastrar solo se da donde el arrastre existe. En el
-              teléfono el movimiento es por botón, y decir «arrastra» ahí es
-              mandar a alguien a intentar un gesto que no va a funcionar.
-              The drag hint only appears where dragging exists. */}
           <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
             Arrastra las tarjetas para cambiar el estado
           </span>
@@ -505,10 +562,13 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
       </div>
 
       {!isPrivileged && (
-        <ProgresoVoluntario
-          tareas={tasks}
-          nombreUsuario={userProfile?.nombre_completo}
-        />
+        <>
+          <ProgresoVoluntario
+            tareas={tasks}
+            nombreUsuario={userProfile?.nombre_completo}
+          />
+          <PoolTareasAbiertas onTareaTomada={fetchTasks} />
+        </>
       )}
 
       {toastExito && (
@@ -601,6 +661,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           mensaje={celebracion.mensaje}
           esUltima={celebracion.esUltima}
           onCerrar={() => setCelebracion(null)}
+          onAbrirBitacora={() => setMostrarBitacora(true)}
         />
       )}
 
@@ -612,6 +673,23 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
             setToastExito(`Se asignaron ${conteo} tareas del perfil "${perfil}" a ${voluntario}.`)
             fetchTasks()
           }}
+        />
+      )}
+
+      {mostrarIniciarTurno && (
+        <ModalIniciarTurno
+          onDone={() => setMostrarIniciarTurno(false)}
+          onSuccess={({ rutina, total }) => {
+            setToastExito(`¡Iniciaste tu turno en "${rutina}" con ${total} tareas!`)
+            fetchTasks()
+          }}
+        />
+      )}
+
+      {mostrarBitacora && (
+        <BitacoraTurno
+          userProfile={userProfile}
+          onDone={() => setMostrarBitacora(false)}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   validarPlantilla,
   validarTareaPlantilla,
   prepararTareasDesdePlantilla,
+  validarNotaTurno,
 } from './plantillas.js'
 
 describe('ordenarTareasPlantilla', () => {
@@ -138,5 +139,34 @@ describe('prepararTareasDesdePlantilla', () => {
   it('maneja listas vacías', () => {
     const res = prepararTareasDesdePlantilla(plantilla, [])
     expect(res).toEqual([])
+  })
+})
+
+describe('validarNotaTurno', () => {
+  it('rechaza notas vacías o solo espacios', () => {
+    expect(validarNotaTurno({ mensaje: '' })).toBe('El mensaje o novedad del turno no puede estar vacío.')
+    expect(validarNotaTurno({ mensaje: '   ' })).toBe('El mensaje o novedad del turno no puede estar vacío.')
+    expect(validarNotaTurno(null)).toBe('El mensaje o novedad del turno no puede estar vacío.')
+  })
+
+  it('rechaza notas mayores a 1000 caracteres', () => {
+    expect(validarNotaTurno({ mensaje: 'x'.repeat(1001) })).toBe(
+      'El mensaje no puede exceder 1000 caracteres.'
+    )
+  })
+
+  it('rechaza turnos inválidos', () => {
+    expect(validarNotaTurno({ mensaje: 'Todo bien', turno: 'Invalido' })).toBe(
+      'El turno seleccionado no es válido.'
+    )
+  })
+
+  it('acepta notas válidas con turno permitido', () => {
+    expect(
+      validarNotaTurno({
+        mensaje: 'Se descongeló el pollo para el almuerzo de mañana.',
+        turno: 'Matutino',
+      })
+    ).toBeNull()
   })
 })

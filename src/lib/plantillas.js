@@ -86,3 +86,22 @@ export function prepararTareasDesdePlantilla(plantilla, items, opciones = {}) {
       }
     })
 }
+
+/**
+ * Valida los datos de una nota de bitácora de turno.
+ * @param {{ mensaje?: string, turno?: string }} datos
+ * @returns {string|null} Mensaje de error o null si es válido.
+ */
+export function validarNotaTurno(datos) {
+  if (!datos || typeof datos.mensaje !== 'string' || !datos.mensaje.trim()) {
+    return 'El mensaje o novedad del turno no puede estar vacío.'
+  }
+  if (datos.mensaje.trim().length > 1000) {
+    return 'El mensaje no puede exceder 1000 caracteres.'
+  }
+  const turnosValidos = ['Matutino', 'Vespertino', 'Nocturno', 'General']
+  if (datos.turno && !turnosValidos.includes(datos.turno)) {
+    return 'El turno seleccionado no es válido.'
+  }
+  return null
+}

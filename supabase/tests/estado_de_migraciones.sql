@@ -86,5 +86,21 @@ from (
            select 1 from information_schema.tables
            where table_schema = 'public' and table_name = 'plantilla_tareas'
          )
+
+  union all
+
+  select 13, 'autonomia_y_bitacora_turno.sql',
+         exists (
+           select 1 from information_schema.tables
+           where table_schema = 'public' and table_name = 'bitacora_turnos'
+         )
+         and exists (
+           select 1 from pg_proc
+           where proname = 'reclamar_tarea_abierta'
+         )
+         and exists (
+           select 1 from pg_proc
+           where proname = 'iniciar_rutina_voluntario'
+         )
 ) t
 order by n;

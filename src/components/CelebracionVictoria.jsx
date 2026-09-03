@@ -12,14 +12,16 @@ export default function CelebracionVictoria({
   mensaje,
   esUltima = false,
   onCerrar,
+  onAbrirBitacora,
 }) {
   useEffect(() => {
     lanzarConfeti()
 
-    // Auto-cierre tras 4 segundos si el voluntario tiene las manos ocupadas
+    // Si es la última tarea, dar más tiempo para leer o interactuar
+    const duracion = esUltima ? 8000 : 4000
     const timer = setTimeout(() => {
       onCerrar()
-    }, 4000)
+    }, duracion)
 
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
@@ -32,7 +34,7 @@ export default function CelebracionVictoria({
       clearTimeout(timer)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onCerrar])
+  }, [onCerrar, esUltima])
 
   return (
     <div
@@ -63,7 +65,7 @@ export default function CelebracionVictoria({
           {mensaje}
         </p>
 
-        <div className="mt-5">
+        <div className="mt-5 space-y-2">
           <button
             type="button"
             autoFocus
@@ -72,6 +74,19 @@ export default function CelebracionVictoria({
           >
             {esUltima ? '¡Excelente día!' : 'Continuar'}
           </button>
+
+          {esUltima && onAbrirBitacora && (
+            <button
+              type="button"
+              onClick={() => {
+                onCerrar()
+                onAbrirBitacora()
+              }}
+              className="w-full min-h-[44px] px-4 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xs font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+            >
+              📝 Dejar novedad para el siguiente turno
+            </button>
+          )}
         </div>
       </div>
     </div>

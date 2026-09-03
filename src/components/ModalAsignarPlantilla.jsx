@@ -102,7 +102,7 @@ export default function ModalAsignarPlantilla({ userProfile, onDone, onSuccess }
   async function handleAsignar(e) {
     e.preventDefault()
     if (!selectedUsuarioId) {
-      setError('Selecciona al voluntario que realizará las tareas.')
+      setError('Selecciona al voluntario o elige dejarlas abiertas en el pool.')
       return
     }
     if (!plantillaActual || selectedItemIds.size === 0) {
@@ -113,9 +113,10 @@ export default function ModalAsignarPlantilla({ userProfile, onDone, onSuccess }
     setSubmitting(true)
     setError('')
 
+    const esPoolAbierto = selectedUsuarioId === '__abiertas__'
     const itemsAAsignar = tareasDePlantilla.filter((t) => selectedItemIds.has(t.id))
     const payloads = prepararTareasDesdePlantilla(plantillaActual, itemsAAsignar, {
-      asignadoId: selectedUsuarioId,
+      asignadoId: esPoolAbierto ? null : selectedUsuarioId,
       creadoPorId: userProfile?.id,
       fechaLimite,
     })
@@ -131,7 +132,9 @@ export default function ModalAsignarPlantilla({ userProfile, onDone, onSuccess }
     if (onSuccess) {
       onSuccess({
         conteo: payloads.length,
-        voluntario: voluntarioActual?.nombre_completo || 'el voluntario',
+        voluntario: esPoolAbierto
+          ? 'Tareas Abiertas (Pool)'
+          : voluntarioActual?.nombre_completo || 'el voluntario',
         perfil: plantillaActual.nombre,
       })
     }
@@ -203,7 +206,8 @@ export default function ModalAsignarPlantilla({ userProfile, onDone, onSuccess }
                   required
                   className="w-full min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">-- Seleccionar voluntario --</option>
+                  <option value="">-- Seleccionar voluntario o pool abierto --</option>
+                  <option value="__abiertas__">⭐ Sin asignar (Pool abierto para cualquier voluntario)</option>
                   {usuarios.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nombre_completo}

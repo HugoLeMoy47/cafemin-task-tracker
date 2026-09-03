@@ -37,6 +37,9 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
   - `TemplateManagement.jsx` — CRUD for volunteer profiles and routine task templates (Admin and Gestor)
   - `ModalAsignarPlantilla.jsx` — modal for batch-assigning routine task profiles to volunteers (Admin and Gestor)
+  - `ModalIniciarTurno.jsx` — volunteer self-check-in modal to pick a daily routine profile (Asignado)
+  - `PoolTareasAbiertas.jsx` — collapsible drawer showing unassigned tasks available for volunteers to claim (Asignado)
+  - `BitacoraTurno.jsx` — shift handover notes and observations panel/modal for all roles
   - `ProgresoVoluntario.jsx` — daily shift progress bar and victory milestones for volunteers (Asignado)
   - `CelebracionVictoria.jsx` — congratulatory modal with positive social impact messaging upon completing tasks
   - `ListaMovil.jsx` — the board below 640 px: one column at a time, tap-to-advance instead of drag. **Not a degraded mode** — see the README section on why the board's interaction model cannot survive a 360 px screen
@@ -55,6 +58,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   9. `proteger_ultimo_administrador.sql` — refuses to demote or delete the last admin (`PT006`)
   10. `desactivacion_de_usuarios.sql` — `activo` flag, `desactivar_usuario()` / `reactivar_usuario()`, and removal of the DELETE policy on `usuarios`
   11. `plantillas_perfil.sql` — routine task templates (`plantillas_perfil`, `plantilla_tareas`) and RLS policies for Admin/Gestor
+  12. `autonomia_y_bitacora_turno.sql` — volunteer self-check-in (`iniciar_rutina_voluntario`), open task pool claiming (`reclamar_tarea_abierta`), and shift handover notes table (`bitacora_turnos`)
 - `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
 - `pruebas/movil.mjs` — the small-screen regression test (`npm run test:movil`). Needs `npm run build:movil` first.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
@@ -62,7 +66,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 
 ## Database schema
 
-Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`, `plantillas_perfil`, `plantilla_tareas`
+Tables: `usuarios`, `tareas`, `categorias`, `areas_trabajo`, `plantillas_perfil`, `plantilla_tareas`, `bitacora_turnos`
 
 Key behaviors:
 - `trg_marcas_de_tiempo` (from `add_fecha_inicio.sql`, replacing the older `trg_fecha_hecho`) stamps `fecha_hecho` on transitions to/from `'Hecho'` **and** `fecha_inicio` when a task first enters `'En curso'`. Without the start stamp only total elapsed time is measurable, which conflates waiting with working — the summary tab depends on this.
