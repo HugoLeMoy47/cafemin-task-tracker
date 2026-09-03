@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { ESTADOS, avanceDisponible } from '../lib/flujoTareas'
+import EvidenceLink from './EvidenceLink'
 
 /**
  * El tablero, para un teléfono.
@@ -92,26 +94,66 @@ function formatearFecha(iso) {
  * The board's card took ~380 px; clamping gets four tasks per screen.
  */
 function TarjetaMovil({ tarea, esPrivilegiado, onAvanzar, onEditar, onReabrir, ocupada }) {
+  const [expandido, setExpandido] = useState(false)
   const vencida =
     tarea.fecha_limite && tarea.estado !== 'Hecho' && new Date(tarea.fecha_limite) < new Date()
   const avance = avanceDisponible(tarea, { esPrivilegiado })
 
   return (
-    <li className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
-      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug line-clamp-2">
+    <li className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 shadow-sm">
+      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug">
         {tarea.nombre}
       </p>
 
       {tarea.detalles && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-1">{tarea.detalles}</p>
+        <div className="mt-1">
+          <p
+            className={`text-xs text-gray-600 dark:text-gray-300 ${
+              expandido ? 'whitespace-pre-line' : 'line-clamp-2'
+            }`}
+          >
+            {tarea.detalles}
+          </p>
+          {tarea.detalles.length > 50 && (
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              className="min-h-[44px] min-w-[44px] inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline focus:outline-none"
+            >
+              {expandido ? '▲ Ocultar instrucciones' : '▼ Ver instrucciones completas'}
+            </button>
+          )}
+        </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+      {/* Alerta preventiva temprana de foto requerida (antes de salir del área) */}
+      {tarea.foto_requerida && !tarea.evidencia_url && (
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-900/60">
+          <span aria-hidden="true">📷</span>
+          <span>Requiere foto de evidencia al terminar</span>
+        </div>
+      )}
+
+      {/* Recordatorio en curso */}
+      {tarea.estado === 'En curso' && tarea.foto_requerida && !tarea.evidencia_url && (
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300/90 italic">
+          💡 Toma la foto antes de retirarte del área de trabajo.
+        </p>
+      )}
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
         {tarea.area && <span className="truncate max-w-[45%]">📍 {tarea.area.nombre}</span>}
         {tarea.fecha_limite && (
           <span className={vencida ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
             {vencida ? '⚠️' : '⏰'} {formatearFecha(tarea.fecha_limite)}
           </span>
+        )}
+        {tarea.evidencia_url && (
+          <EvidenceLink
+            value={tarea.evidencia_url}
+            label="📷 Ver foto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline min-h-[44px] inline-flex items-center font-medium"
+          />
         )}
         {esPrivilegiado && tarea.asignado && (
           <span className="truncate max-w-[45%]">👤 {tarea.asignado.nombre_completo}</span>
@@ -128,19 +170,19 @@ function TarjetaMovil({ tarea, esPrivilegiado, onAvanzar, onEditar, onReabrir, o
                completo apilados hacen que la lista se lea como una pila de
                botones y no como tareas: el nombre de la tarea deja de ser lo
                primero que ve el ojo. Con 44 px de alto y ~150 de ancho el
-               objetivo táctil sigue siendo holgado.
-               Content width, not full: three stacked full-width buttons make
-               the list read as buttons instead of tasks. */
+               objetivo táctil sigue siendo holgado. */
             className="min-h-[44px] rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50
-              text-white text-sm font-medium px-5 transition-colors
+              text-white text-sm font-medium px-4 transition-colors
               focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-              dark:focus-visible:ring-offset-gray-800"
+              dark:focus-visible:ring-offset-gray-800 inline-flex items-center gap-1.5"
           >
-            {/* El botón anuncia la foto ANTES de pulsarse. Un diálogo que
-                aparece sin aviso, en un teléfono, se lee como un error.
-                Announced up front: an unannounced dialog reads as an error. */}
-            {avance.etiqueta}
-            {avance.pideFoto && ' 📷'}
+            {avance.destino === 'En curso' ? (
+              <>▶ Comenzar tarea</>
+            ) : avance.pideFoto ? (
+              <>📷 Tomar foto y concluir</>
+            ) : (
+              <>✓ Concluir tarea</>
+            )}
           </button>
         )}
 
@@ -183,16 +225,47 @@ export default function ListaMovil({
   onReabrir,
   ocupada,
 }) {
+  const todasTerminadas =
+    !esPrivilegiado && conteos?.Pendiente === 0 && conteos?.['En curso'] === 0 && conteos?.Hecho > 0
+  const sinTareas =
+    conteos?.Pendiente === 0 && conteos?.['En curso'] === 0 && conteos?.Hecho === 0
+
   return (
     <div>
       <SelectorDeEstado activo={estadoActivo} onCambiar={onCambiarEstado} conteos={conteos} />
 
       {tareas.length === 0 ? (
-        <p className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
-          No hay tareas en {estadoActivo.toLowerCase()}.
-        </p>
+        todasTerminadas ? (
+          <div className="text-center py-10 px-4">
+            <span className="text-3xl mb-2 inline-block select-none" role="img" aria-label="Celebración">
+              🌟
+            </span>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              ¡Completaste tus tareas pendientes!
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
+              Puedes revisar tus logros del día en la pestaña &ldquo;Hecho&rdquo;. ¡Gracias por tu apoyo en CAFEMIN!
+            </p>
+          </div>
+        ) : sinTareas ? (
+          <div className="text-center py-10 px-4">
+            <span className="text-3xl mb-2 inline-block select-none" role="img" aria-label="Descanso">
+              ☕
+            </span>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              No hay tareas registradas
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs mx-auto">
+              {esPrivilegiado ? 'Usa el botón "+ Nueva tarea" para crear una.' : '¡Todo al día por el momento!'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
+            No hay tareas en {estadoActivo.toLowerCase()}.
+          </p>
+        )
       ) : (
-        <ul className="space-y-2 list-none p-0 m-0">
+        <ul className="space-y-2.5 list-none p-0 m-0">
           {tareas.map((tarea) => (
             <TarjetaMovil
               key={tarea.id}

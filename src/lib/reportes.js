@@ -149,7 +149,13 @@ function promedio(valores) {
 
 export function estaVencida(t, ahora = new Date()) {
   if (!t.fecha_limite || t.estado === 'Hecho') return false
-  const limite = new Date(t.fecha_limite)
+  let limite
+  if (typeof t.fecha_limite === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.fecha_limite)) {
+    const [y, m, d] = t.fecha_limite.split('-').map(Number)
+    limite = new Date(y, m - 1, d)
+  } else {
+    limite = new Date(t.fecha_limite)
+  }
   if (Number.isNaN(limite.getTime())) return false
   const hoy = new Date(ahora)
   hoy.setHours(0, 0, 0, 0)

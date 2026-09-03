@@ -14,7 +14,10 @@ import { puedeMover } from '../lib/flujoTareas'
 import { usePantallaChica } from '../hooks/usePantallaChica'
 import ListaMovil from './ListaMovil'
 import EvidenceLink from './EvidenceLink'
+import ProgresoVoluntario from './ProgresoVoluntario'
+import CelebracionVictoria from './CelebracionVictoria'
 import { mensajeDeError } from '../lib/errores'
+import { obtenerMensajeVictoria } from '../lib/gamificacion'
 
 const COLUMNS = [
   {
@@ -46,6 +49,7 @@ function formatDate(iso) {
 }
 
 function CardContent({ task }) {
+  const [expandido, setExpandido] = useState(false)
   const isOverdue =
     task.fecha_limite && task.estado !== 'Hecho' && new Date(task.fecha_limite) < new Date()
 
@@ -53,18 +57,50 @@ function CardContent({ task }) {
     <>
       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug">{task.nombre}</p>
       {task.detalles && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">{task.detalles}</p>
+        <div className="mt-1">
+          <p
+            className={`text-xs text-gray-600 dark:text-gray-300 ${
+              expandido ? 'whitespace-pre-line' : 'line-clamp-2'
+            }`}
+          >
+            {task.detalles}
+          </p>
+          {task.detalles.length > 60 && (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpandido((v) => !v)
+              }}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium min-h-[32px] inline-flex items-center mt-0.5 focus:outline-none"
+            >
+              {expandido ? '▲ Ocultar' : '▼ Ver instrucciones'}
+            </button>
+          )}
+        </div>
       )}
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
+
+      {task.foto_requerida && !task.evidencia_url && (
+        <div className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/60 inline-flex items-center gap-1">
+          <span aria-hidden="true">📷</span>
+          <span>Requiere foto al terminar</span>
+        </div>
+      )}
+
+      {task.estado === 'En curso' && task.foto_requerida && !task.evidencia_url && (
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300/90 italic">
+          💡 Toma la foto antes de retirarte del área.
+        </p>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
         {task.categoria && <span>🏷 {task.categoria.nombre}</span>}
         {task.area && <span>📍 {task.area.nombre}</span>}
         {task.fecha_limite && (
           <span className={isOverdue ? 'text-red-500 dark:text-red-400 font-medium' : ''}>
             {isOverdue ? '⚠️' : '⏰'} {formatDate(task.fecha_limite)}
           </span>
-        )}
-        {task.foto_requerida && !task.evidencia_url && (
-          <span className="text-orange-500 dark:text-orange-400">📷 foto requerida</span>
         )}
         {task.evidencia_url && (
           <EvidenceLink
@@ -246,6 +282,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const [photoTask, setPhotoTask] = useState(null)
   const [dragError, setDragError] = useState('')
   const [moviendo, setMoviendo] = useState(null)
+  const [celebracion, setCelebracion] = useState(null)
 
   /**
    * Columna visible en el teléfono. Arranca SIEMPRE en 'Pendiente', aunque esté
@@ -324,6 +361,13 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
     if (error) {
       setTasks(previousTasks)
       setDragError(mensajeDeError(error, 'No se pudo actualizar el estado. Intenta de nuevo.'))
+    } else if (nuevoEstado === 'Hecho') {
+      const restantes = previousTasks.filter((t) => t.id !== task.id && t.estado !== 'Hecho').length
+      setCelebracion({
+        tarea: task,
+        mensaje: obtenerMensajeVictoria(),
+        esUltima: !isPrivileged && restantes === 0,
+      })
     }
     setMoviendo(null)
   }
@@ -337,6 +381,14 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   }
 
   async function handlePhotoSuccess() {
+    if (photoTask) {
+      const restantes = tasks.filter((t) => t.id !== photoTask.id && t.estado !== 'Hecho').length
+      setCelebracion({
+        tarea: photoTask,
+        mensaje: obtenerMensajeVictoria(),
+        esUltima: !isPrivileged && restantes === 0,
+      })
+    }
     setPhotoTask(null)
     await fetchTasks()
   }
@@ -379,9 +431,23 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
             </button>
           )}
         </div>
-        <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-          {isPrivileged ? 'No hay tareas aún.' : 'No tienes tareas asignadas aún.'}
-        </div>
+        {!isPrivileged ? (
+          <div className="text-center py-16 px-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
+            <span className="text-4xl mb-3 inline-block select-none" role="img" aria-label="Descanso">
+              ☕
+            </span>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+              ¡Todo en orden por ahora!
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
+              No tienes tareas asignadas por el momento. Muchas gracias por acompañar y apoyar la labor comunitaria en CAFEMIN.
+            </p>
+          </div>
+        ) : (
+          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+            No hay tareas aún.
+          </div>
+        )}
       </div>
     )
   }
@@ -410,6 +476,13 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           </span>
         </div>
       </div>
+
+      {!isPrivileged && (
+        <ProgresoVoluntario
+          tareas={tasks}
+          nombreUsuario={userProfile?.nombre_completo}
+        />
+      )}
 
       {dragError && (
         <div className="mb-4 px-4 py-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm">
@@ -476,6 +549,15 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           task={photoTask}
           onSuccess={handlePhotoSuccess}
           onCancel={() => setPhotoTask(null)}
+        />
+      )}
+
+      {celebracion && (
+        <CelebracionVictoria
+          tarea={celebracion.tarea}
+          mensaje={celebracion.mensaje}
+          esUltima={celebracion.esUltima}
+          onCerrar={() => setCelebracion(null)}
         />
       )}
     </div>
