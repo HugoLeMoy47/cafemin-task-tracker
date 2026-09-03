@@ -204,6 +204,7 @@ npm run format:check  # Verifica formato sin escribir
   > Ese hash es la parte delicada. El script en línea marca si la página se abrió desde un enlace de recuperación de contraseña, y tiene que correr **antes** que el bundle. Una `script-src 'self'` a secas lo bloquea, y entonces quien sigue un enlace de recuperación entra a la aplicación normal sin cambiar nada: un agujero de seguridad silencioso introducido por una medida de seguridad. Por eso el plugin tira el build si no encuentra el script.
 
   > `script-src` **no** lleva `unsafe-inline` — es la directiva que da todo el valor. `style-src` sí, porque las gráficas usan `style={{…}}` de React en once sitios; la alternativa (`style-src-attr`) deja los tooltips fuera de sitio en navegadores que no la entienden, y el riesgo no compensa cuando la revisión no encontró ningún vector de XSS.
+- **HTTPS obligatorio por un año**: `Strict-Transport-Security: max-age=31536000; includeSubDomains`. Faltaba, y no se descubrió leyendo el repositorio sino **las cabeceras que Cloudflare sirve de verdad** — que es la única comprobación que vale, porque generar el archivo `_headers` no prueba que llegue al navegador. Sin HSTS, la primera visita que alguien escribe a mano (`cafemintt…` sin `https://`) sale por HTTP y admite que se la intercepten antes del redirect. **No lleva `preload` a propósito**: entrar a la lista de precarga de los navegadores es fácil y salir tarda meses.
 - **No se puede dejar el sistema sin Administrador**: `proteger_ultimo_administrador.sql` rechaza degradar o borrar al último (`PT006`). La salida, si no, sería el SQL Editor de Supabase — justo el conocimiento que esta aplicación existe para no exigirle a un refugio.
 - **El acceso se desactiva, no se borra**: el botón de la vista de Usuarios llama a `desactivar_usuario()`, que marca `activo = false` —lo que hace que `get_my_role()` devuelva nulo y **todas** las políticas denieguen, incluso a una sesión ya abierta— y además banea la cuenta en Auth, así que la credencial deja de servir. Dos capas, porque cada una tapa el hueco de la otra: la marca no impide autenticarse, el baneo no toca una sesión abierta.
 
@@ -284,6 +285,17 @@ El tablero se rehízo para la pantalla chica; los reportes se corrigieron sobre 
 | Nodos de texto < 12 px | 14 | 0 |
 | Alto de la barra de filtros | 640 px (la pantalla) | 154 px plegada |
 | Desborde horizontal del documento | 0 px | 0 px |
+
+### 📱 La pantalla de login
+
+Se midió aparte, y tarde, porque **el arnés móvil no la ve**: simula Supabase y arranca ya con sesión, así que `Login.jsx` y `UpdatePassword.jsx` —las dos pantallas sin sesión, y las únicas que toca el 100% de la gente— nunca entraron en ninguna medición. Salieron a la luz leyendo el sitio ya desplegado: los campos de correo y contraseña medían **42 px** y el enlace de «¿Olvidaste tu contraseña?», **20 px**.
+
+Y hay un detalle que solo aparece midiendo la build local: con `VITE_DEMO_MODE=true`, producción **oculta** los enlaces de registro, así que revisar el sitio publicado no puede encontrarlos. Medidos sin esa bandera, eran otros dos enlaces de 20 px.
+
+| Login a 320 / 360 / 412 px | Antes | Después |
+|---|---|---|
+| Objetivos táctiles < 44 px | 3 de 5 (y 2 más ocultos por la bandera de demo) | **0 de 5** |
+| Desborde horizontal | 0 px | 0 px |
 
 **Lo que sigue abierto, medido y sin arreglar:** las tres gráficas de las pestañas (`GraficaEstado`, `GraficaAsignado`, `GraficaSemanal`) siguen siendo SVG con `viewBox` de 600 px. Su texto cae a **5.1 px a 320, 5.9 px a 360 y 6.9 px a 412**. Se ve en la captura: los nombres de las barras son manchas. No se tocaron en esta ronda. Y la tabla «Tareas que se repiten» tiene `min-w-[420px]`: a 320 px esconde 166 px por scroll lateral, incluida la columna «Promedio», sin ninguna señal de que haya más. Ambas cosas son trabajo pendiente, no cosas que ya funcionen.
 

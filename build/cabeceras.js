@@ -101,7 +101,24 @@ export function construirCsp({ supabase, hashesDeScript }) {
   return directivas.map(([nombre, valores]) => `${nombre} ${valores.join(' ')}`).join('; ')
 }
 
-/** Contenido completo del archivo `_headers`. */
+/**
+ * Contenido completo del archivo `_headers`.
+ * Full contents of the `_headers` file.
+ *
+ * Sobre `Strict-Transport-Security`: faltaba, y se descubrió leyendo las
+ * cabeceras que Cloudflare sirve DE VERDAD en producción, no este archivo.
+ * Sin ella, la primera visita que alguien escribe a mano —`cafemintt…` sin
+ * `https://`— sale por HTTP y admite que se la intercepten antes de que el
+ * redirect ocurra. Un año de `max-age` es lo habitual.
+ *
+ * **No lleva `preload` a propósito.** Entrar a la lista de precarga de los
+ * navegadores es fácil y salir tarda meses, y además afectaría al dominio
+ * entero, no solo a esta demostración.
+ *
+ * HSTS was missing — found by reading the headers Cloudflare actually serves,
+ * not this file. `preload` is deliberately omitted: getting on the browsers'
+ * preload list is easy and getting off takes months.
+ */
 export function contenidoDeHeaders(csp) {
   return `# GENERADO AL CONSTRUIR — no editar a mano.
 # Fuente: build/cabeceras.js, aplicado por el plugin de vite.config.js.
@@ -114,6 +131,7 @@ export function contenidoDeHeaders(csp) {
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
 
 # Los assets llevan hash en el nombre: se pueden cachear indefinidamente.
 /assets/*

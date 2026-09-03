@@ -122,6 +122,17 @@ describe('contenidoDeHeaders', () => {
     }
   })
 
+  it('exige HTTPS por un año / pins HTTPS for a year', () => {
+    expect(texto).toContain('Strict-Transport-Security: max-age=31536000; includeSubDomains')
+  })
+
+  it('no entra a la lista de precarga / does not opt into preload', () => {
+    // Salir de la lista de precarga tarda meses. Si alguien la agrega, que sea
+    // una decisión y no un descuido copiando una receta de internet.
+    // Getting off the preload list takes months: make it a decision, not a paste.
+    expect(texto).not.toContain('preload')
+  })
+
   it('mantiene el cacheo de assets / keeps asset caching', () => {
     expect(texto).toContain('/assets/*')
     expect(texto).toContain('immutable')

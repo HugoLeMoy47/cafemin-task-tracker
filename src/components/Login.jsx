@@ -73,7 +73,21 @@ export default function Login() {
     setLoading(false)
   }
 
-  const inputClass = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+  /**
+   * `min-h-[44px]`: medido EN PRODUCCIÓN, no en el arnés. Los campos salían a
+   * 42 px. Faltaban dos, pero el piso es el piso, y esta es la única pantalla
+   * que toca el 100% de la gente — y la única que se toca antes de saber si la
+   * aplicación sirve.
+   *
+   * Measured in production, not in the harness: the fields were 42 px. Two
+   * pixels short, but this is the one screen every single user touches.
+   */
+  const inputClass =
+    'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 min-h-[44px] text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+
+  /** El enlace de «olvidé mi contraseña» medía 20 px de alto: solo el texto. */
+  const claseEnlace =
+    'text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center justify-center min-h-[44px] px-3 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -161,14 +175,14 @@ export default function Login() {
           {mode === 'reset' ? (
             <button
               onClick={() => { setMode('login'); setError(''); setMessage('') }}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
+              className={claseEnlace}
             >
               Volver a iniciar sesión
             </button>
           ) : (
             <button
               onClick={() => { setMode('reset'); setError(''); setMessage('') }}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
+              className={claseEnlace}
             >
               ¿Olvidaste tu contraseña?
             </button>
@@ -187,7 +201,7 @@ export default function Login() {
               ¿No tienes cuenta?{' '}
               <button
                 onClick={() => { setMode('signup'); setError(''); setMessage('') }}
-                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                className={`${claseEnlace} font-medium`}
               >
                 Regístrate
               </button>
@@ -197,7 +211,7 @@ export default function Login() {
               ¿Ya tienes cuenta?{' '}
               <button
                 onClick={() => { setMode('login'); setError(''); setMessage('') }}
-                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                className={`${claseEnlace} font-medium`}
               >
                 Inicia sesión
               </button>
