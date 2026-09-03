@@ -131,7 +131,8 @@ src/
 │       ├── Dashboard.jsx           # Resumen: KPIs, flujo, espera vs. trabajo, recurrentes, carga
 │       ├── graficas.jsx            # Gráficas por pestaña (solo componentes)
 │       ├── base.jsx                # Primitivas de dibujo compartidas por las gráficas
-│       ├── BarraFiltros.jsx        # Barra de filtros global, arriba de las pestañas
+│       ├── FlujoVertical.jsx       # El flujo en HTML para teléfono: el SVG cae a 4 px reales
+│       ├── BarraFiltros.jsx        # Barra de filtros global; se pliega por debajo de 640 px
 │       ├── EncabezadoOrdenable.jsx # <th> con aria-sort e indicador de dirección
 │       └── CollapsibleGroup.jsx    # Grupo colapsable de filas
 ├── lib/                       # Lógica pura, sin React y sin Supabase: se prueba sola
@@ -260,6 +261,31 @@ Las dos formas de mover una tarea —arrastre y botón— pasan por **una sola f
 | Objetivos táctiles < 44 px | — | 0 de 17 |
 | Alto de tarjeta | ~380 px | 165 px |
 | Tareas por pantalla | 1½ | 3 |
+
+---
+
+### 📱 Los reportes en un teléfono
+
+El tablero se rehízo para la pantalla chica; los reportes se corrigieron sobre lo que ya había. Cuatro hallazgos, todos de **medir el render real** a 320, 360 y 412 px, no de leer el código:
+
+**1. El diagrama de flujo no se podía leer.** El SVG usa un `viewBox` de 700 px y en un Android de 360 se pinta a 294 — escala 0.42. Sus etiquetas de 10 px aterrizaban a **4.0 px reales**. Los números grandes sobrevivían; las palabras que los explican, no. Por debajo de 640 px se dibuja `reports/FlujoVertical.jsx`: el mismo dato en HTML, hacia abajo en vez de a lo ancho, con texto que además respeta el tamaño de letra que la persona configuró en su teléfono. En un refugio, con gente de todas las edades, eso no es un detalle.
+
+**2. Una de las cuatro pestañas era invisible.** Estaban en un `overflow-x-auto`: en 360 px, «Por Fecha» empezaba en x=355 sin ninguna señal de que existiera. Ahora las cuatro se acomodan en dos filas.
+
+**3. Once objetivos táctiles por debajo de 44 px.** El buscador y los cinco selectores medían 34 px de alto; los dos botones con forma de enlace, 16 px. Con un dedo, y no con un ratón, son blancos que se fallan.
+
+**4. Y arreglar el punto 3 rompió otra cosa.** Con los seis campos a 44 px, la barra de filtros ocupaba los 640 px completos de la pantalla: se abría «Reportes» y no se veía **ni un solo número**, solo controles para filtrar datos que aún no se habían visto. Por debajo de 640 px la barra ahora se pliega a un botón `Filtros ▾`. Se abre sola cuando el enlace ya traía filtros aplicados — si alguien comparte una vista filtrada, esconder el motivo por el que se ven 12 tareas y no 42 sería cambiar un problema por otro.
+
+| Reportes a 360 px | Antes | Después |
+|---|---|---|
+| Texto más chico del diagrama de flujo | 4.0 px reales | 12 px (HTML) |
+| Pestañas alcanzables sin descubrir un scroll | 3 de 4 | 4 de 4 |
+| Objetivos táctiles < 44 px | 11 de 11 | 0 de 12 |
+| Nodos de texto < 12 px | 14 | 0 |
+| Alto de la barra de filtros | 640 px (la pantalla) | 154 px plegada |
+| Desborde horizontal del documento | 0 px | 0 px |
+
+**Lo que sigue abierto, medido y sin arreglar:** las tres gráficas de las pestañas (`GraficaEstado`, `GraficaAsignado`, `GraficaSemanal`) siguen siendo SVG con `viewBox` de 600 px. Su texto cae a **5.1 px a 320, 5.9 px a 360 y 6.9 px a 412**. Se ve en la captura: los nombres de las barras son manchas. No se tocaron en esta ronda. Y la tabla «Tareas que se repiten» tiene `min-w-[420px]`: a 320 px esconde 166 px por scroll lateral, incluida la columna «Promedio», sin ninguna señal de que haya más. Ambas cosas son trabajo pendiente, no cosas que ya funcionen.
 
 ---
 
@@ -474,7 +500,8 @@ src/
 │       ├── Dashboard.jsx           # Summary: KPIs, flow, wait vs. work, recurring, load
 │       ├── graficas.jsx            # Per-tab charts (components only)
 │       ├── base.jsx                # Drawing primitives shared by the charts
-│       ├── BarraFiltros.jsx        # Global filter bar, above the tabs
+│       ├── FlujoVertical.jsx       # The flow in HTML for phones: the SVG lands at 4 real px
+│       ├── BarraFiltros.jsx        # Global filter bar; collapses below 640 px
 │       ├── EncabezadoOrdenable.jsx # <th> with aria-sort and a direction indicator
 │       └── CollapsibleGroup.jsx    # Collapsible row group
 ├── lib/                       # Pure logic — no React, no Supabase — tested on its own
@@ -563,6 +590,28 @@ The summary answers what a listing cannot: how much is closed, how much is overd
 - A person or area no longer present in the data is dropped on load, rather than leaving a blank dropdown over an empty table with nothing to explain it.
 
 `src/lib/enlaceReporte.js` is pure — string in, state out — so the round trip is pinned by tests without a browser. `Reports.jsx` is the only place that touches `window.history`.
+
+---
+
+### 📱 On a phone
+
+**The target device is an entry-level Android at 360 px, not a designer's phone.** Every number below was measured by rendering the real components at 320, 360 and 412 px — not inferred from the code.
+
+**The board.** Three 220 px columns do not fit in 360 px, and the failure is not the layout: dragging assumes you can see the source and the destination at once. Below 640 px, `ListaMovil.jsx` shows one state at a time and moves tasks by button, with the destination written on it. Both paths — drag and button — go through a single function, `moverTarea`, which reads `src/lib/flujoTareas.js`; two paths deciding independently which move is legal will diverge, and the one that lags is always the one tested least. Those rules mirror `PT002` and `PT003`; the database remains the authority.
+
+**The reports.** Four defects, all found by measuring: the flow diagram's SVG labels landed at **4.0 real px** at 360 (replaced below 640 px by `FlujoVertical.jsx`, HTML that also honors the reader's system font size); one of the four tabs began at x=355 inside an `overflow-x-auto` with no cue it existed; eleven touch targets sat below 44 px; and fixing that third one made the filter bar fill the entire 640 px viewport, so the report opened on controls and zero data — hence the collapsible bar, which opens itself when the link already carried filters.
+
+| At 360 px | Before | After |
+|---|---|---|
+| Board width | 692 px (328 visible) | fits |
+| Visible drop targets | 0 | 3, one at a time |
+| Smallest flow-diagram text | 4.0 real px | 12 px (HTML) |
+| Tabs reachable without discovering a scroll | 3 of 4 | 4 of 4 |
+| Touch targets < 44 px | 11 of 11 | 0 of 12 |
+| Text nodes < 12 px | 14 | 0 |
+| Horizontal document overflow | — | 0 px |
+
+**Still open, measured and unfixed:** the three per-tab charts (`GraficaEstado`, `GraficaAsignado`, `GraficaSemanal`) are still 600 px-`viewBox` SVGs whose text falls to **5.1 px at 320, 5.9 px at 360 and 6.9 px at 412**. The "Tareas que se repiten" table carries `min-w-[420px]` and hides 166 px at 320 px — including the "Promedio" column — with no cue there is more. Neither was touched in this round.
 
 ---
 

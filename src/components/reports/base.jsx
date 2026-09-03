@@ -18,6 +18,16 @@ export const COLOR_ESTADO = {
   Hecho: 'var(--viz-hecho)',
 }
 
+/**
+ * Días con un decimal, o una raya cuando no hay dato. Vive aquí y no en
+ * Dashboard porque ahora lo usan el dibujo de escritorio y la versión vertical
+ * del teléfono, y dos formateadores distintos acaban mostrando «1.0 d» en una
+ * pantalla y «1 d» en la otra para el mismo número.
+ * Shared so the desktop drawing and the phone version cannot format the same
+ * number two different ways.
+ */
+export const fmtDias = (n) => (n === null || n === undefined ? '—' : `${n.toFixed(1)} d`)
+
 export const textoPrimario = 'fill-gray-700 dark:fill-gray-200'
 export const textoTenue = 'fill-gray-500 dark:fill-gray-400'
 

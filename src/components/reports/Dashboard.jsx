@@ -1,5 +1,7 @@
 import { Leyenda, Marco } from './graficas'
-import { COLOR_ESTADO, textoPrimario, textoTenue, useTooltip } from './base'
+import { COLOR_ESTADO, fmtDias, textoPrimario, textoTenue, useTooltip } from './base'
+import { usePantallaChica } from '../../hooks/usePantallaChica'
+import FlujoVertical from './FlujoVertical'
 import {
   cargaPorDimension,
   metricasGlobales,
@@ -20,7 +22,6 @@ import {
  * the first screen still leaves with the essentials.
  */
 
-const fmtDias = (n) => (n === null || n === undefined ? '—' : `${n.toFixed(1)} d`)
 
 /* ------------------------------------------------------------------ */
 /* Fila de indicadores                                                 */
@@ -75,6 +76,7 @@ function FilaIndicadores({ m }) {
  */
 function Flujo({ m }) {
   const { manejadores, nodo } = useTooltip()
+  const esChica = usePantallaChica()
 
   const W = 700
   const H = 200
@@ -99,6 +101,21 @@ function Flujo({ m }) {
     { desde: 0, n: m.arrancaron, dias: m.esperaMedia, texto: 'arrancaron', color: 'var(--viz-encurso)' },
     { desde: 1, n: m.hechas, dias: m.trabajoMedio, texto: 'se cerraron', color: 'var(--viz-hecho)' },
   ]
+
+  /* En el teléfono el mismo dibujo aterriza a escala 0.42 y sus etiquetas a
+     4 px reales: los números se leen, las palabras que los explican no. Ahí se
+     dibuja hacia abajo y en HTML. Ver FlujoVertical.jsx.
+     On a phone the same drawing lands at 4 real pixels. */
+  if (esChica) {
+    return (
+      <Marco
+        titulo="Cómo fluyen las tareas"
+        descripcion="Las cajas son cuántas tareas están detenidas en cada estado. Entre ellas, cuántas cruzaron ese paso y cuánto tardaron en promedio."
+      >
+        <FlujoVertical m={m} />
+      </Marco>
+    )
+  }
 
   return (
     <Marco

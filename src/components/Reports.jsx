@@ -294,7 +294,7 @@ export default function Reports({ userProfile }) {
   }
 
   const btnBarra =
-    'text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50'
+    'text-sm font-medium px-4 min-h-[44px] rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50'
 
   const tableWrap = 'bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden'
   const tableClass = 'w-full text-sm min-w-[480px]'
@@ -306,14 +306,23 @@ export default function Reports({ userProfile }) {
     <div>
       <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-5">Reportes</h2>
 
-      {/* Tab bar — scroll horizontal en móvil */}
-      <div className="overflow-x-auto -mx-1 px-1 mb-5">
-        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 min-w-max">
+      {/* Las cuatro pestañas, siempre visibles.
+          Antes iban en una tira con desplazamiento lateral y en 360 px la
+          cuarta —«Por Fecha»— empezaba en el píxel 355: se alcanzaba, pero
+          nada indicaba que existiera, así que en el teléfono el reporte
+          parecía tener tres. Ahora envuelven a dos renglones.
+          The fourth tab used to start past the right edge with no cue that it
+          existed. Now they wrap. */}
+      <div className="mb-5">
+        <div className="flex flex-wrap gap-x-1 border-b border-gray-200 dark:border-gray-700">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+              /* min-h-[44px]: la medición encontró pestañas de 38 px de alto y
+                 un buscador de 34. Con un dedo sobre una pantalla chica, eso es
+                 errar el toque. / 44 px is the floor a finger needs. */
+              className={`px-4 min-h-[44px] text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 tab === t
                   ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'

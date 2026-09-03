@@ -33,7 +33,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
   - `ListaMovil.jsx` — the board below 640 px: one column at a time, tap-to-advance instead of drag. **Not a degraded mode** — see the README section on why the board's interaction model cannot survive a 360 px screen
   - `Reports.jsx` — reports container (Admin/Gestor only): four tabs, the global filter bar, per-tab sort, CSV export, and the URL state. **The only module that touches `window.history`.**
-  - `components/reports/` — `Dashboard.jsx` (summary: KPIs, flow board, wait vs. work, recurring tasks, load), `graficas.jsx` (per-tab charts — components only, so React fast-refresh works), `base.jsx` (drawing primitives), `BarraFiltros.jsx`, `EncabezadoOrdenable.jsx`, `CollapsibleGroup.jsx`
+  - `components/reports/` — `Dashboard.jsx` (summary: KPIs, flow board, wait vs. work, recurring tasks, load), `graficas.jsx` (per-tab charts — components only, so React fast-refresh works), `base.jsx` (drawing primitives **and `fmtDias`**, which lives here so the desktop SVG and the mobile HTML cannot format a duration differently), `FlujoVertical.jsx` (the flow in HTML below 640 px — the SVG's labels land at 4 real px), `BarraFiltros.jsx` (collapses below 640 px), `EncabezadoOrdenable.jsx`, `CollapsibleGroup.jsx`
 - `supabase/schema.sql` — full database schema: tables, triggers, RLS policies, seed data
 - `supabase/migrations/` — run in this order; the README lists it too:
   1. `add_fecha_limite.sql` — adds `fecha_limite date` to `tareas`
@@ -120,9 +120,13 @@ Inside `reports`, the active tab, the filters and the sort are held in `Reports.
 - Drag-and-drop exists **only above 640 px**. Below it, `ListaMovil` moves tasks by button. Any new way to move a task must go through `moverTarea`, never straight to `supabase.update`.
 - Tailwind breakpoints: `sm:` (640 px) is the primary mobile/desktop split.
 - `Navbar.jsx`: hamburger icon (`flex sm:hidden`) toggles a dropdown menu; desktop nav items are `hidden sm:flex`.
-- Tables in `UserManagement`, `Reports`, and `TaskList`: wrapped in `overflow-x-auto` div; tables have `min-w-[480px]` to prevent collapsing.
-- `KanbanBoard`: the three-column layout is wrapped in `overflow-x-auto` with `min-w-[480px]` so it scrolls horizontally on narrow screens.
+- Tables in `UserManagement`, `Reports`, and `TaskList`: wrapped in `overflow-x-auto` div; tables have `min-w-[480px]` to prevent collapsing. **This is the weakest part of the phone story** — a `min-w` inside `overflow-x-auto` hides content with no cue that it exists. Measured: "Tareas que se repiten" hides 166 px at 320 px, including its last column. Do not add another table this way without an affordance.
+- The `overflow-x-auto` in `KanbanBoard` wraps the **desktop** tree only; below 640 px that tree is not rendered at all.
 - Forms use `grid-cols-1 sm:grid-cols-2` for two-column layout on wider screens.
+
+**Charts are the trap.** An SVG with a `viewBox` scales its text along with everything else, so a font size that reads fine on a desktop is not a font size on a phone — it is that number times the scale factor. `viewBox="0 0 600 …"` at 360 px renders at scale 0.49, so its 12 px labels are **5.9 real px**. Before adding or resizing chart text, compute `clientWidth / viewBox-width` and multiply. Where the labels carry the meaning, render HTML instead of SVG — that is why `reports/FlujoVertical.jsx` exists — which has the added benefit of honoring the reader's system font size. `GraficaEstado`, `GraficaAsignado` and `GraficaSemanal` have **not** been fixed and still measure 5.1–6.9 real px.
+
+**Raising touch targets makes things taller; check what got pushed off screen.** Taking the six report filters to 44 px made the filter bar consume the whole 640 px viewport, so "Reportes" opened on controls and no data. `BarraFiltros` now collapses below 640 px, and defaults to open when `hayFiltrosActivos` is true so a shared filtered link still explains itself. Any control block that grows on mobile needs the same second measurement.
 - Action buttons stack vertically on mobile using `flex-col sm:flex-row`.
 
 ## Footer
