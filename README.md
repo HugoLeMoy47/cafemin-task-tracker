@@ -29,7 +29,7 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 | 🔗 **Vistas compartibles** | Filtros, pestaña y orden viven en la URL: se copia el enlace y quien lo abre ve exactamente lo mismo |
 | 🗂 **Catálogos** | CRUD de categorías y áreas de trabajo con edición inline |
 | ⚡ **Tiempo real** | Los cambios de otros usuarios se reflejan automáticamente |
-| 📱 **Diseño responsivo** | Interfaz optimizada para móvil y escritorio; menú hamburguesa en pantallas pequeñas |
+| 📱 **Diseño para teléfono de gama básica** | Por debajo de 640 px el tablero se convierte en una lista de una columna con avance por botón; medido en 320, 360 y 412 px |
 | 🌙 **Modo oscuro** | Alterna entre tema claro y oscuro; persiste entre sesiones y respeta la preferencia del sistema |
 
 ### 🎭 Roles
@@ -38,7 +38,7 @@ CAFEMIN Task Tracker es una SPA (Single Page Application) que permite a un equip
 |-----|-----------------|
 | **Administrador** | Acceso completo: tareas, usuarios, catálogos y reportes. En el Kanban: crea, edita, elimina y reabre tareas. Ve todas las tareas. |
 | **Gestor** | Crea y edita tareas, ve reportes. En el Kanban: crea y edita tareas, puede reabrirlas. Ve todas las tareas. |
-| **Asignado** | Ve sus propias tareas en el Kanban. Arrastra para cambiar estado (solo avanzar; reabrir requiere admin). |
+| **Asignado** | Ve sus propias tareas. Avanza el estado arrastrando (escritorio) o con un botón (teléfono); solo hacia adelante, reabrir requiere Admin o Gestor. |
 
 > Los nuevos usuarios quedan con rol `Asignado` hasta que un Administrador lo cambie desde la vista de Usuarios.
 
@@ -125,6 +125,7 @@ src/
 │   ├── EvidenceLink.jsx       # Abre una evidencia pidiendo su URL firmada
 │   ├── UserManagement.jsx     # Alta y gestión de usuarios (solo Admin)
 │   ├── CatalogManagement.jsx  # CRUD de catálogos con edición inline (solo Admin)
+│   ├── ListaMovil.jsx         # El tablero por debajo de 640 px: una columna, avance por botón
 │   ├── Reports.jsx            # Contenedor de reportes: pestañas, filtros y estado en la URL
 │   └── reports/
 │       ├── Dashboard.jsx           # Resumen: KPIs, flujo, espera vs. trabajo, recurrentes, carga
@@ -136,8 +137,12 @@ src/
 ├── lib/                       # Lógica pura, sin React y sin Supabase: se prueba sola
 │   ├── reportes.js            # Agregaciones, métricas, filtrado y ordenamiento
 │   ├── enlaceReporte.js       # Estado del reporte ⇄ cadena de consulta de la URL
+│   ├── errores.js             # Traductor de errores de Supabase (lista blanca)
+│   ├── flujoTareas.js         # Flujo de estados: qué avance se ofrece y a quién
 │   ├── csv.js                 # Construcción y descarga del CSV
 │   └── evidencias.js          # Rutas de evidencia y URLs firmadas
+├── hooks/
+│   └── usePantallaChica.js    # matchMedia al corte `sm:`, leído en el primer render
 └── utils/
     └── validation.js          # Helpers: validación de email, contraseña, tarea e imagen
 
@@ -229,6 +234,32 @@ Cuatro pestañas. **Resumen** llega primero porque quien entra a reportes quiere
 - Una persona o un área que ya no existe en los datos se descarta al cargar. Dejarla puesta mostraría el selector en blanco y la tabla en cero, sin nada que explique por qué.
 
 El módulo `src/lib/enlaceReporte.js` es puro —cadena entra, estado sale— para poder fijar el ida y vuelta con pruebas sin navegador. `Reports.jsx` es el único que toca `window.history`.
+
+---
+
+### 📱 El tablero en un teléfono
+
+Por debajo de **640 px** (el corte `sm:` de Tailwind) el Kanban no se estrecha: **cambia de forma**. Una columna a la vez con un selector de estado arriba, y el avance por **botón** —«Marcar en curso», «Marcar hecha»— en lugar de arrastrar.
+
+> **Por qué, con los números.** El tablero de tres columnas ocupa **692 px**. En un Android de 360 —el más común de gama de entrada— se ven **328**: la columna «Hecho» empieza en el píxel 500 y ni siquiera el centro de la zona para soltar «En curso» cabe, queda en el 362. En ese aparato **no hay una sola zona de destino visible**, así que el gesto que el producto le pide a quien hace el trabajo no tiene a dónde llegar.
+
+> **No se arregla estrechando columnas.** Tres de 220 px no entran en 360, y a 160 el texto de las tarjetas deja de caber. Lo que no sobrevive a la pantalla chica no es el diseño: es el modelo de interacción, porque arrastrar presupone ver origen y destino a la vez.
+
+> **Y no es un modo degradado.** Incluso donde el arrastre funciona, en un teléfono es un gesto caro, y con una sola mano —que es como se usa esto mientras se carga algo— es peor. Un toque con el destino escrito en el botón es más rápido que el tablero.
+
+El botón **anuncia la foto antes de pulsarse** (`Marcar hecha 📷`): un diálogo que aparece sin aviso, en un teléfono, se lee como un error.
+
+Las dos formas de mover una tarea —arrastre y botón— pasan por **una sola función**, `moverTarea` en `KanbanBoard.jsx`, que consulta `src/lib/flujoTareas.js`. Dos caminos decidiendo por su cuenta qué movimiento es válido acaban divergiendo, y el que se queda atrás es siempre el que menos se prueba. Esas reglas son un espejo de `PT002` y `PT003`; la que manda sigue siendo la base de datos.
+
+**Medido antes y después**, con los componentes reales y datos con nombres largos:
+
+| | Antes | Después |
+|---|---|---|
+| Ancho del tablero en 360 px | 692 px (se ven 328) | cabe entero |
+| Zonas de destino visibles | 0 | 3, una a la vez |
+| Objetivos táctiles < 44 px | — | 0 de 17 |
+| Alto de tarjeta | ~380 px | 165 px |
+| Tareas por pantalla | 1½ | 3 |
 
 ---
 
@@ -343,7 +374,7 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 | 🔗 **Shareable views** | Filters, tab and sort live in the URL: copy the link and the recipient sees exactly the same view |
 | 🗂 **Catalogs** | CRUD for categories and work areas with inline editing |
 | ⚡ **Real-time** | Changes from other users appear automatically |
-| 📱 **Responsive design** | Mobile-first layout; hamburger menu on small screens, scrollable tables |
+| 📱 **Built for entry-level phones** | Below 640 px the board becomes a single-column list with tap-to-advance; measured at 320, 360 and 412 px |
 | 🌙 **Dark mode** | Toggle between light and dark themes; persists across sessions and respects system preference |
 
 ### 🎭 Roles
@@ -352,7 +383,7 @@ CAFEMIN Task Tracker is a Single Page Application for managing operational tasks
 |------|-----------------|
 | **Administrador** | Full access: tasks, users, catalogs, and reports. On the Kanban: create, edit, delete, and reopen tasks. Sees all tasks. |
 | **Gestor** | Creates and edits tasks, views reports. On the Kanban: create, edit, and reopen tasks. Sees all tasks. |
-| **Asignado** | Views their own tasks on the Kanban board. Can drag cards forward only; reopening requires admin. |
+| **Asignado** | Views their own tasks. Advances state by dragging (desktop) or tapping a button (phone); forward only, reopening requires Admin or Gestor. |
 
 > New users start with the `Asignado` role until an Administrator changes it from the Users view.
 
@@ -437,6 +468,7 @@ src/
 │   ├── EvidenceLink.jsx       # Opens an evidence photo via a freshly signed URL
 │   ├── UserManagement.jsx     # User creation and management (Admin only)
 │   ├── CatalogManagement.jsx  # Catalog CRUD with inline editing (Admin only)
+│   ├── ListaMovil.jsx         # The board below 640 px: one column, tap to advance
 │   ├── Reports.jsx            # Reports container: tabs, filters and URL state
 │   └── reports/
 │       ├── Dashboard.jsx           # Summary: KPIs, flow, wait vs. work, recurring, load
@@ -448,8 +480,12 @@ src/
 ├── lib/                       # Pure logic — no React, no Supabase — tested on its own
 │   ├── reportes.js            # Aggregations, metrics, filtering and sorting
 │   ├── enlaceReporte.js       # Report state ⇄ URL query string
+│   ├── errores.js             # Supabase error translator (allowlist)
+│   ├── flujoTareas.js         # State flow: which move is offered, and to whom
 │   ├── csv.js                 # CSV construction and download
 │   └── evidencias.js          # Evidence paths and signed URLs
+├── hooks/
+│   └── usePantallaChica.js    # matchMedia at the `sm:` breakpoint, read on first render
 └── utils/
     └── validation.js          # Helpers: email, password, task and image validation
 

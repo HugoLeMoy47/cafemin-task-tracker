@@ -10,6 +10,9 @@ import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../supabaseClient'
 import { validateImageFile } from '../utils/validation'
 import { buildEvidencePath } from '../lib/evidencias'
+import { puedeMover } from '../lib/flujoTareas'
+import { usePantallaChica } from '../hooks/usePantallaChica'
+import ListaMovil from './ListaMovil'
 import EvidenceLink from './EvidenceLink'
 import { mensajeDeError } from '../lib/errores'
 
@@ -242,6 +245,19 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
   const [activeTask, setActiveTask] = useState(null)
   const [photoTask, setPhotoTask] = useState(null)
   const [dragError, setDragError] = useState('')
+  const [moviendo, setMoviendo] = useState(null)
+
+  /**
+   * Columna visible en el teléfono. Arranca SIEMPRE en 'Pendiente', aunque esté
+   * vacía: el selector muestra los tres conteos, así que una lista vacía con
+   * «En curso 5» al lado se entiende sola. Saltar automáticamente a la primera
+   * columna con tareas haría que el sitio donde aterrizas cambie de un día para
+   * otro, y para quien lo usa a diario la posición predecible vale más que el
+   * atajo.
+   * Always starts on 'Pendiente': a predictable landing beats a clever one.
+   */
+  const [estadoMovil, setEstadoMovil] = useState('Pendiente')
+  const esChica = usePantallaChica()
 
   const isAdmin = userProfile?.rol === 'Administrador'
   const isGestor = userProfile?.rol === 'Gestor'
@@ -280,29 +296,44 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
     setActiveTask(tasks.find((t) => t.id === active.id) || null)
   }
 
-  async function handleDragEnd({ active, over }) {
-    setActiveTask(null)
-    if (!over) return
-    const task = tasks.find((t) => t.id === active.id)
-    if (!task || task.estado === over.id) return
-    const newEstado = over.id
+  /**
+   * El ÚNICO camino por el que una tarea cambia de estado.
+   *
+   * Lo usan el arrastre del tablero y el botón del teléfono. Tener dos caminos
+   * que deciden por su cuenta si un movimiento es válido —y si pide foto— es
+   * como se termina con una regla que se aplica en un aparato y no en el otro;
+   * y el que se queda atrás siempre es el que menos se prueba.
+   *
+   * The ONE path a task changes state through, shared by the desktop drag and
+   * the phone button. Two paths deciding validity on their own is how a rule
+   * ends up applying on one device and not the other.
+   */
+  async function moverTarea(task, nuevoEstado) {
+    if (!puedeMover(task, nuevoEstado, { esPrivilegiado: isPrivileged })) return
 
-    // Asignado cannot reopen completed tasks via drag
-    if (!isPrivileged && task.estado === 'Hecho') return
-
-    if (newEstado === 'Hecho' && task.foto_requerida && !task.evidencia_url && !isPrivileged) {
+    if (nuevoEstado === 'Hecho' && task.foto_requerida && !task.evidencia_url && !isPrivileged) {
       setPhotoTask(task)
       return
     }
 
     const previousTasks = tasks
     setDragError('')
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, estado: newEstado } : t)))
-    const { error } = await supabase.from('tareas').update({ estado: newEstado }).eq('id', task.id)
+    setMoviendo(task.id)
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, estado: nuevoEstado } : t)))
+    const { error } = await supabase.from('tareas').update({ estado: nuevoEstado }).eq('id', task.id)
     if (error) {
       setTasks(previousTasks)
-      setDragError('No se pudo actualizar el estado. Intenta de nuevo.')
+      setDragError(mensajeDeError(error, 'No se pudo actualizar el estado. Intenta de nuevo.'))
     }
+    setMoviendo(null)
+  }
+
+  async function handleDragEnd({ active, over }) {
+    setActiveTask(null)
+    if (!over) return
+    const task = tasks.find((t) => t.id === active.id)
+    if (!task) return
+    await moverTarea(task, over.id)
   }
 
   async function handlePhotoSuccess() {
@@ -370,6 +401,10 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
               + Nueva tarea
             </button>
           )}
+          {/* La pista de arrastrar solo se da donde el arrastre existe. En el
+              teléfono el movimiento es por botón, y decir «arrastra» ahí es
+              mandar a alguien a intentar un gesto que no va a funcionar.
+              The drag hint only appears where dragging exists. */}
           <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
             Arrastra las tarjetas para cambiar el estado
           </span>
@@ -382,6 +417,28 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
         </div>
       )}
 
+      {/* ── Teléfono: una columna a la vez, avance por botón ──
+          Medido: el tablero ocupa 692 px y en un Android de 360 se ven 328,
+          con «Hecho» fuera de pantalla. Ninguna zona para soltar cabe entera,
+          así que el arrastre no tiene destino. Ver src/components/ListaMovil.jsx.
+          Measured: no drop zone fits on a 360 px screen. */}
+      {esChica ? (
+        <ListaMovil
+          tareas={tasksByEstado[estadoMovil]}
+          estadoActivo={estadoMovil}
+          onCambiarEstado={setEstadoMovil}
+          conteos={{
+            Pendiente: tasksByEstado.Pendiente.length,
+            'En curso': tasksByEstado['En curso'].length,
+            Hecho: tasksByEstado.Hecho.length,
+          }}
+          esPrivilegiado={isPrivileged}
+          onAvanzar={(tarea, avance) => moverTarea(tarea, avance.destino)}
+          onEditar={onEdit}
+          onReabrir={handleReopen}
+          ocupada={moviendo}
+        />
+      ) : (
       <div className="overflow-x-auto pb-2">
         <div className="flex gap-4 min-w-[480px]">
           <DndContext
@@ -412,6 +469,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           </DndContext>
         </div>
       </div>
+      )}
 
       {photoTask && (
         <PhotoModal

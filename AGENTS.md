@@ -18,7 +18,9 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `enlaceReporte.js` — report state ⇄ URL query string (`leerEnlace`, `escribirEnlace`, `sanearFiltros`)
   - `errores.js` — `mensajeDeError(error, respaldo)` and `mensajeDeLogin(error)`. **Allowlist**: only text this module defines is ever shown; anything unrecognized becomes the caller's fallback
   - `csv.js` — CSV construction and download (`;` separator + UTF-8 BOM for Spanish Excel)
+  - `flujoTareas.js` — the task state flow: `siguienteEstado`, `avanceDisponible`, `puedeMover`. Mirrors the database's `PT002`/`PT003` so the UI never offers a move the database will refuse
   - `evidencias.js` — evidence paths and signed URLs; imports the client lazily so the helpers stay testable without credentials
+- `src/hooks/usePantallaChica.js` — `matchMedia` at Tailwind's `sm:` breakdown (639 px) via `useSyncExternalStore`, so the value is right on the first render and a phone never flashes the desktop board
 - `src/components/` — feature components:
   - `Login.jsx` — email/password login and password-reset request (self-registration is hidden when `VITE_DEMO_MODE` is on)
   - `UpdatePassword.jsx` — new-password screen reached through the recovery link
@@ -29,6 +31,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
   - `TaskForm.jsx` — create/edit form with fields: nombre, detalles, asignado, categoría, área, fecha_limite, foto_requerida
   - `UserManagement.jsx` — user creation and role management (Admin only)
   - `CatalogManagement.jsx` — CRUD for categorías and áreas de trabajo with inline editing (Admin only)
+  - `ListaMovil.jsx` — the board below 640 px: one column at a time, tap-to-advance instead of drag. **Not a degraded mode** — see the README section on why the board's interaction model cannot survive a 360 px screen
   - `Reports.jsx` — reports container (Admin/Gestor only): four tabs, the global filter bar, per-tab sort, CSV export, and the URL state. **The only module that touches `window.history`.**
   - `components/reports/` — `Dashboard.jsx` (summary: KPIs, flow board, wait vs. work, recurring tasks, load), `graficas.jsx` (per-tab charts — components only, so React fast-refresh works), `base.jsx` (drawing primitives), `BarraFiltros.jsx`, `EncabezadoOrdenable.jsx`, `CollapsibleGroup.jsx`
 - `supabase/schema.sql` — full database schema: tables, triggers, RLS policies, seed data
@@ -111,6 +114,10 @@ Inside `reports`, the active tab, the filters and the sort are held in `Reports.
 
 ## Mobile responsiveness
 
+**The target device is an entry-level Android at 360 px, not a designer's phone.** Measure before claiming a layout works: render the real component with long, accented task names at 320, 360 and 412 px and check horizontal overflow, touch-target size (44 px floor), font size (12 px floor), and whether every interactive target is fully on screen. Short demo strings hide every overflow there is.
+
+- **`KanbanBoard` renders one of two trees**, chosen in JS by `usePantallaChica`, not hidden with CSS: hiding one with `hidden sm:flex` would keep the `DndContext` and its sensors mounted on the device least able to afford it.
+- Drag-and-drop exists **only above 640 px**. Below it, `ListaMovil` moves tasks by button. Any new way to move a task must go through `moverTarea`, never straight to `supabase.update`.
 - Tailwind breakpoints: `sm:` (640 px) is the primary mobile/desktop split.
 - `Navbar.jsx`: hamburger icon (`flex sm:hidden`) toggles a dropdown menu; desktop nav items are `hidden sm:flex`.
 - Tables in `UserManagement`, `Reports`, and `TaskList`: wrapped in `overflow-x-auto` div; tables have `min-w-[480px]` to prevent collapsing.
