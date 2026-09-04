@@ -25,26 +25,30 @@ create index if not exists idx_bitacora_area on bitacora_turnos(area_trabajo_id)
 
 alter table bitacora_turnos enable row level security;
 
--- Todos los autenticados leen las notas para coordinar la operación
+-- Todos los usuarios activos leen las notas para coordinar la operación
+drop policy if exists "All authenticated read bitacora" on bitacora_turnos;
 create policy "All authenticated read bitacora"
   on bitacora_turnos for select
-  using (auth.uid() is not null);
+  using (get_my_role() is not null);
 
--- Cualquier voluntario o gestor autenticado puede dejar novedades
+-- Cualquier voluntario o gestor activo puede dejar novedades
+drop policy if exists "Authenticated insert bitacora" on bitacora_turnos;
 create policy "Authenticated insert bitacora"
   on bitacora_turnos for insert
-  with check (auth.uid() is not null);
+  with check (get_my_role() is not null);
 
 -- Solo el autor o un Administrador pueden eliminar una nota
+drop policy if exists "Author or Admin delete bitacora" on bitacora_turnos;
 create policy "Author or Admin delete bitacora"
   on bitacora_turnos for delete
-  using (get_my_role() = 'Administrador' or usuario_id = auth.uid());
+  using (get_my_role() = 'Administrador' or (usuario_id = auth.uid() and get_my_role() is not null));
 
 
 -- ----------------------------------------------------------------------------
 -- 2. Tareas Abiertas: Asignado puede ver tareas sin asignar en estado Pendiente
 -- ----------------------------------------------------------------------------
 
+drop policy if exists "Asignado see open tasks" on tareas;
 create policy "Asignado see open tasks"
   on tareas for select
   using (
@@ -67,8 +71,8 @@ as $$
 declare
   v_tarea tareas%rowtype;
 begin
-  if auth.uid() is null then
-    raise exception 'Debes haber iniciado sesión para tomar una tarea.' using errcode = 'PT010';
+  if get_my_role() is null then
+    raise exception 'Debes tener una cuenta activa para tomar una tarea.' using errcode = 'PT010';
   end if;
 
   -- Bloqueo FOR UPDATE para garantizar atomicidad y evitar condición de carrera
@@ -116,8 +120,8 @@ declare
   v_item record;
   v_count int := 0;
 begin
-  if auth.uid() is null then
-    raise exception 'Debes haber iniciado sesión para iniciar una rutina.' using errcode = 'PT020';
+  if get_my_role() is null then
+    raise exception 'Debes tener una cuenta activa para iniciar una rutina.' using errcode = 'PT020';
   end if;
 
   select * into v_plantilla
@@ -166,3 +170,26 @@ end;
 $$;
 
 grant execute on function iniciar_rutina_voluntario(uuid) to authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- 5. Lectura de plantillas y tareas activas para voluntarios (Asignado)
+-- Permite que los voluntarios vean los perfiles activos para iniciar su jornada
+-- ----------------------------------------------------------------------------
+
+drop policy if exists "Asignado read active plantillas_perfil" on plantillas_perfil;
+create policy "Asignado read active plantillas_perfil"
+  on plantillas_perfil for select
+  using (get_my_role() = 'Asignado' and activo = true);
+
+drop policy if exists "Asignado read active plantilla_tareas" on plantilla_tareas;
+create policy "Asignado read active plantilla_tareas"
+  on plantilla_tareas for select
+  using (
+    get_my_role() = 'Asignado'
+    and exists (
+      select 1 from plantillas_perfil p
+       where p.id = plantilla_tareas.plantilla_id and p.activo = true
+    )
+  );
+

@@ -62,7 +62,7 @@ CAFEMIN Task Tracker is a Vite + React SPA with Tailwind CSS and Supabase for ba
 - `build/cabeceras.js` — **the only source of the published `_headers`.** A Vite plugin in `vite.config.js` runs it in `writeBundle` and writes `dist/_headers`, overwriting the copy of `public/_headers` (which is kept only as a documented fallback). It hashes the inline `<script>` from the built `index.html` so `script-src` never needs `unsafe-inline`, and derives `connect-src`/`img-src` from `VITE_SUPABASE_URL`. **The plugin throws on anything unexpected** — a deploy with no security headers looks exactly like a healthy one, and that silence is what makes such a failure last for months.
 - `pruebas/movil.mjs` — the small-screen regression test (`npm run test:movil`). Needs `npm run build:movil` first.
 - `supabase/tests/` — **run this before proposing any change to a policy, trigger or migration.** It mounts a throwaway PostgreSQL mirror by executing the real migration files in order, then replays 21 cases as a role without `BYPASSRLS`. See its README.
-- `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql`, `03_plantillas_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` and profile ids prefixed `cafepro0-` so a reset never touches live data
+- `supabase/seeds/01_cuentas_demo.sql`, `02_datos_demo.sql`, `03_plantillas_demo.sql` — demo data; re-runnable, dates relative to `now()`, seeded task ids prefixed `cafede00-` and profile ids prefixed `cafeb000-` so a reset never touches live data
 
 ## Database schema
 

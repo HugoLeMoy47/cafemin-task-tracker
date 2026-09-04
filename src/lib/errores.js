@@ -42,6 +42,12 @@ export const REGLAS_DEL_PROYECTO = {
   PT007: 'Solo un Administrador puede cambiar el acceso de otras personas.',
   PT008: 'No puedes desactivar tu propio acceso. Pídeselo a otro Administrador.',
   PT009: 'No se encontró a esa persona.',
+  PT010: 'Debes tener una cuenta activa para tomar una tarea.',
+  PT011: 'La tarea no existe.',
+  PT012: 'Esta tarea ya fue tomada por otra persona.',
+  PT013: 'Solo se pueden tomar tareas en estado Pendiente.',
+  PT020: 'Debes tener una cuenta activa para iniciar una rutina.',
+  PT021: 'El perfil o rutina no existe o no está activo.',
 }
 
 /**

@@ -2,8 +2,8 @@
 -- Semilla 3 de 3: Perfiles de rutina y plantillas de tareas para voluntariado
 -- Routine task templates and volunteer profiles for CAFEMIN
 --
--- Re-ejecutable: utiliza UUIDs predecibles con prefijo 'cafepro0-' para que
--- pueda re-ejecutarse sin duplicar perfiles ni alterar rutinas creadas en vivo.
+-- Re-ejecutable: utiliza UUIDs predecibles con prefijo 'cafeb000-' (hexadecimal)
+-- para que pueda re-ejecutarse sin duplicar perfiles ni alterar datos en vivo.
 -- ============================================================================
 
 -- 1. Catálogos base necesarios
@@ -18,7 +18,7 @@ insert into categorias (nombre) values
 on conflict (nombre) do nothing;
 
 -- 2. Limpieza quirúrgica de perfiles sembrados previamente
-delete from plantillas_perfil where id::text like 'cafepro0-%';
+delete from plantillas_perfil where id::text like 'cafeb000-%';
 
 -- 3. Inserción de perfiles de rutina típicos de la operación de CAFEMIN
 do $$
@@ -50,7 +50,7 @@ begin
   -- PERFIL 1: Asistente de Cocina
   insert into plantillas_perfil (id, nombre, descripcion, area_trabajo_id, categoria_id, creado_por, activo)
   values (
-    'cafepro0-0000-0000-0000-000000000001',
+    'cafeb000-0000-0000-0000-000000000001',
     'Asistente de Cocina (Turno Matutino)',
     'Preparación de ingredientes, servicio de alimentos y sanitización general de cocina.',
     v_area_cocina,
@@ -60,16 +60,16 @@ begin
   );
 
   insert into plantilla_tareas (plantilla_id, orden, nombre, detalles, foto_requerida, area_trabajo_id, categoria_id) values
-  ('cafepro0-0000-0000-0000-000000000001', 1, 'Desinfección de superficies y equipo', 'Limpiar y desinfectar mesas de acero inoxidable, tablas de picar y cuchillos antes de iniciar.', false, v_area_cocina, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000001', 2, 'Lavado y picado de ingredientes', 'Picar verduras, desinfectar legumbres y alistar insumos para el menú del día según indique coordinación.', false, v_area_cocina, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000001', 3, 'Apoyo en barra y servicio de raciones', 'Servir porciones equitativas y calientes a las personas y familias albergadas.', false, v_area_cocina, v_cat_acomp),
-  ('cafepro0-0000-0000-0000-000000000001', 4, 'Lavado de loza, charolas y utensilios', 'Lavar, enjuagar con agua caliente y secar vajilla y charolas de comensales.', false, v_area_cocina, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000001', 5, 'Sanitización profunda y cierre de cocina', 'Limpieza de parrillas, vaciado de trampas de grasa y retiro de basura orgánica.', true, v_area_cocina, v_cat_limpieza);
+  ('cafeb000-0000-0000-0000-000000000001', 1, 'Desinfección de superficies y equipo', 'Limpiar y desinfectar mesas de acero inoxidable, tablas de picar y cuchillos antes de iniciar.', false, v_area_cocina, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000001', 2, 'Lavado y picado de ingredientes', 'Picar verduras, desinfectar legumbres y alistar insumos para el menú del día según indique coordinación.', false, v_area_cocina, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000001', 3, 'Apoyo en barra y servicio de raciones', 'Servir porciones equitativas y calientes a las personas y familias albergadas.', false, v_area_cocina, v_cat_acomp),
+  ('cafeb000-0000-0000-0000-000000000001', 4, 'Lavado de loza, charolas y utensilios', 'Lavar, enjuagar con agua caliente y secar vajilla y charolas de comensales.', false, v_area_cocina, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000001', 5, 'Sanitización profunda y cierre de cocina', 'Limpieza de parrillas, vaciado de trampas de grasa y retiro de basura orgánica.', true, v_area_cocina, v_cat_limpieza);
 
   -- PERFIL 2: Ropero y Clasificación de Donativos
   insert into plantillas_perfil (id, nombre, descripcion, area_trabajo_id, categoria_id, creado_por, activo)
   values (
-    'cafepro0-0000-0000-0000-000000000002',
+    'cafeb000-0000-0000-0000-000000000002',
     'Recepción y Ropero (Donaciones)',
     'Clasificación de ropa, calzado, kits de higiene y distribución a personas en tránsito.',
     v_area_almacen,
@@ -79,16 +79,16 @@ begin
   );
 
   insert into plantilla_tareas (plantilla_id, orden, nombre, detalles, foto_requerida, area_trabajo_id, categoria_id) values
-  ('cafepro0-0000-0000-0000-000000000002', 1, 'Recepción y registro de donaciones recibidas', 'Pesar o cuantificar bultos de donativos ingresados durante el día.', false, v_area_almacen, v_cat_donativos),
-  ('cafepro0-0000-0000-0000-000000000002', 2, 'Clasificación de prendas por talla y género', 'Separar ropa de bebé, infantil, dama y caballero en buen estado.', false, v_area_almacen, v_cat_donativos),
-  ('cafepro0-0000-0000-0000-000000000002', 3, 'Acomodo en anaqueles y doblado', 'Mantener percheros y estantes accesibles para entregas rápidas.', false, v_area_almacen, v_cat_donativos),
-  ('cafepro0-0000-0000-0000-000000000002', 4, 'Entrega de kits de vestimenta e higiene', 'Armar y entregar paquetes individuales a familias recién ingresadas.', false, v_area_almacen, v_cat_acomp),
-  ('cafepro0-0000-0000-0000-000000000002', 5, 'Inventario y cierre de almacén', 'Fotografiar orden final de anaqueles y reportar faltantes de tallas críticas.', true, v_area_almacen, v_cat_donativos);
+  ('cafeb000-0000-0000-0000-000000000002', 1, 'Recepción y registro de donaciones recibidas', 'Pesar o cuantificar bultos de donativos ingresados durante el día.', false, v_area_almacen, v_cat_donativos),
+  ('cafeb000-0000-0000-0000-000000000002', 2, 'Clasificación de prendas por talla y género', 'Separar ropa de bebé, infantil, dama y caballero en buen estado.', false, v_area_almacen, v_cat_donativos),
+  ('cafeb000-0000-0000-0000-000000000002', 3, 'Acomodo en anaqueles y doblado', 'Mantener percheros y estantes accesibles para entregas rápidas.', false, v_area_almacen, v_cat_donativos),
+  ('cafeb000-0000-0000-0000-000000000002', 4, 'Entrega de kits de vestimenta e higiene', 'Armar y entregar paquetes individuales a familias recién ingresadas.', false, v_area_almacen, v_cat_acomp),
+  ('cafeb000-0000-0000-0000-000000000002', 5, 'Inventario y cierre de almacén', 'Fotografiar orden final de anaqueles y reportar faltantes de tallas críticas.', true, v_area_almacen, v_cat_donativos);
 
   -- PERFIL 3: Sanitización de Áreas Comunes
   insert into plantillas_perfil (id, nombre, descripcion, area_trabajo_id, categoria_id, creado_por, activo)
   values (
-    'cafepro0-0000-0000-0000-000000000003',
+    'cafeb000-0000-0000-0000-000000000003',
     'Higiene y Sanitización de Áreas Comunes',
     'Aseo profundo de pasillos, sanitarios comunitarios y reposición de insumos de higiene.',
     v_area_banos,
@@ -98,15 +98,15 @@ begin
   );
 
   insert into plantilla_tareas (plantilla_id, orden, nombre, detalles, foto_requerida, area_trabajo_id, categoria_id) values
-  ('cafepro0-0000-0000-0000-000000000003', 1, 'Barrido y trapeado de pasillos y patio', 'Barrer accesos principales y aplicar desinfectante en piso.', false, null, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000003', 2, 'Lavado y sanitización de baños comunitarios', 'Lavar inodoros, lavamanos y regaderas con solución clorada.', true, v_area_banos, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000003', 3, 'Reposición de jabón, toallas y papel higiénico', 'Verificar dispensadores en baños de hombres y mujeres.', false, v_area_banos, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000003', 4, 'Vaciado de contenedores de basura', 'Amarrar bolsas y llevarlas al contenedor exterior de recolección.', false, null, v_cat_limpieza);
+  ('cafeb000-0000-0000-0000-000000000003', 1, 'Barrido y trapeado de pasillos y patio', 'Barrer accesos principales y aplicar desinfectante en piso.', false, null, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000003', 2, 'Lavado y sanitización de baños comunitarios', 'Lavar inodoros, lavamanos y regaderas con solución clorada.', true, v_area_banos, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000003', 3, 'Reposición de jabón, toallas y papel higiénico', 'Verificar dispensadores en baños de hombres y mujeres.', false, v_area_banos, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000003', 4, 'Vaciado de contenedores de basura', 'Amarrar bolsas y llevarlas al contenedor exterior de recolección.', false, null, v_cat_limpieza);
 
   -- PERFIL 4: Ludoteca y Apoyo a la Infancia
   insert into plantillas_perfil (id, nombre, descripcion, area_trabajo_id, categoria_id, creado_por, activo)
   values (
-    'cafepro0-0000-0000-0000-000000000004',
+    'cafeb000-0000-0000-0000-000000000004',
     'Ludoteca y Cuidado Infantil',
     'Actividades recreativas, apoyo escolar y acompañamiento socioemocional a la niñez migrante.',
     v_area_ludoteca,
@@ -116,9 +116,9 @@ begin
   );
 
   insert into plantilla_tareas (plantilla_id, orden, nombre, detalles, foto_requerida, area_trabajo_id, categoria_id) values
-  ('cafepro0-0000-0000-0000-000000000004', 1, 'Acondicionamiento y tapetes de ludoteca', 'Desinfectar tapetes de foami y organizar mesas de trabajo infantil.', false, v_area_ludoteca, v_cat_limpieza),
-  ('cafepro0-0000-0000-0000-000000000004', 2, 'Taller de lectura y expresión artística', 'Lectura de cuentos, dinámicas de dibujo y juegos cooperativos.', false, v_area_ludoteca, v_cat_educacion),
-  ('cafepro0-0000-0000-0000-000000000004', 3, 'Supervisión de colación y lavado de manos', 'Acompañar a las y los niños en la toma de su refrigerio matutino.', false, v_area_ludoteca, v_cat_acomp),
-  ('cafepro0-0000-0000-0000-000000000004', 4, 'Recolección, desinfección y guardado de juguetes', 'Asegurar que ningún material quede en el piso al terminar el horario.', true, v_area_ludoteca, v_cat_limpieza);
+  ('cafeb000-0000-0000-0000-000000000004', 1, 'Acondicionamiento y tapetes de ludoteca', 'Desinfectar tapetes de foami y organizar mesas de trabajo infantil.', false, v_area_ludoteca, v_cat_limpieza),
+  ('cafeb000-0000-0000-0000-000000000004', 2, 'Taller de lectura y expresión artística', 'Lectura de cuentos, dinámicas de dibujo y juegos cooperativos.', false, v_area_ludoteca, v_cat_educacion),
+  ('cafeb000-0000-0000-0000-000000000004', 3, 'Supervisión de colación y lavado de manos', 'Acompañar a las y los niños en la toma de su refrigerio matutino.', false, v_area_ludoteca, v_cat_acomp),
+  ('cafeb000-0000-0000-0000-000000000004', 4, 'Recolección, desinfección y guardado de juguetes', 'Asegurar que ningún material quede en el piso al terminar el horario.', true, v_area_ludoteca, v_cat_limpieza);
 
 end $$;

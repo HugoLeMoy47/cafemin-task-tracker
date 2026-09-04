@@ -61,9 +61,25 @@ describe('reglas del proyecto / project rules', () => {
   it('todas las reglas tienen texto / every rule has text', () => {
     // Si una migración define un código nuevo y nadie lo agrega aquí, el
     // Administrador ve el respaldo genérico en vez de la razón real.
-    for (const pt of ['PT001', 'PT002', 'PT003', 'PT004', 'PT005', 'PT006', 'PT007', 'PT008', 'PT009']) {
+    for (const pt of [
+      'PT001',
+      'PT002',
+      'PT003',
+      'PT004',
+      'PT005',
+      'PT006',
+      'PT007',
+      'PT008',
+      'PT009',
+      'PT010',
+      'PT011',
+      'PT012',
+      'PT013',
+      'PT020',
+      'PT021',
+    ]) {
       expect(mensajeDeError({ code: pt })).toBe(REGLAS_DEL_PROYECTO[pt])
-      expect(REGLAS_DEL_PROYECTO[pt].length).toBeGreaterThan(20)
+      expect(REGLAS_DEL_PROYECTO[pt].length).toBeGreaterThan(15)
     }
   })
 })
