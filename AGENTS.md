@@ -77,6 +77,12 @@ Key behaviors:
 - Trigger `trg_restrict_asignado_update` enforces at DB level that Asignado can only modify `estado` and `evidencia_url`, **and since `reglas_cierre_asignado.sql` also enforces the closing rules**: no closing a `foto_requerida` task without evidence (`PT003`), no reopening from `'Hecho'` (`PT002`), evidence must belong to the task (`PT004`), and evidence cannot be stripped from a closed task (`PT005`). Admin and Gestor bypass the first two by design.
 - That function must **never mention the start-stamp column by name**: `add_fecha_inicio.sql` has a guard that inspects `prosrc` and aborts if it appears, because listing it would stop an Asignado from starting a task.
 - It also normalizes blank `evidencia_url` to `null` on write, so `is null` is reliable everywhere else.
+- Autonomy, task pool, and shift log (from `autonomia_y_bitacora_turno.sql`):
+  - `reclamar_tarea_abierta(p_tarea_id)` and `iniciar_rutina_voluntario(p_plantilla_id)` are `SECURITY DEFINER` with pinned `search_path = public, pg_temp`, and strictly verify `get_my_role() is not null` (PT010, PT020) so deactivated accounts cannot take tasks or spawn routines.
+  - `reclamar_tarea_abierta` uses `SELECT ... FOR UPDATE` to atomically lock the task row and prevent double-claim race conditions when two volunteers tap simultaneously.
+  - `bitacora_turnos` RLS policies enforce `get_my_role() is not null` on SELECT and INSERT, blocking deactivated users even if their auth JWT has not expired. Deletion is restricted to the note author or an Administrador.
+  - Active routine templates (`plantillas_perfil` and `plantilla_tareas`) are readable by `Asignado` for self-check-in, while creation/editing/deletion remains strictly guarded for Admin and Gestor.
+  - All project error codes (`PT001` through `PT021`) are explicitly registered in the allowlist of `src/lib/errores.js`.
 
 ## Storage
 

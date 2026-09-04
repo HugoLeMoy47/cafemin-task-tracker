@@ -234,6 +234,7 @@ npm run test:movil    # Regresión en 320/360/412 px y con letra al 130% (necesi
   > **Por qué desapareció el botón de eliminar.** Borraba la fila de `usuarios` y nada más: la cuenta de autenticación seguía viva, y —lo que nadie había visto— `tareas.asignado_id` tiene `on delete set null`, así que **desasignaba en silencio todas sus tareas, incluidas las ya cerradas**. En un sistema cuyo argumento es la trazabilidad, borrar quién cerró una tarea es peor que el problema de acceso. Si de verdad hay que eliminar a alguien, se hace desde el panel de Supabase, donde quien lo haga ve lo que está borrando.
 - **Credenciales en `.env`**: nunca se commitean al repositorio.
 - **Creación de usuarios sin reemplazar sesión**: la función de alta de usuarios usa un cliente Supabase con `persistSession: false` para que el Admin no pierda su sesión activa.
+- **Autonomía, concurrencia atómica y bitácora segura**: `reclamar_tarea_abierta` e `iniciar_rutina_voluntario` (`autonomia_y_bitacora_turno.sql`) exigen que la cuenta esté activa (`get_my_role() is not null`) para evitar llamadas de cuentas revocadas. El reclamo de tareas abiertas usa `SELECT ... FOR UPDATE` para evitar condiciones de carrera si dos personas pulsan la misma tarea en el albergue simultáneamente. La tabla `bitacora_turnos` restringe lectura e inserción solo a usuarios activos (`get_my_role() is not null`), y su borrado al autor o Administrador. Todos los códigos de negocio (`PT001` a `PT021`) están cubiertos en la lista blanca de `src/lib/errores.js`.
 
 ---
 
@@ -647,6 +648,7 @@ npm run format:check  # Check formatting without writing
 - **Access is deactivated, not deleted**: the Users view calls `desactivar_usuario()`, which sets `activo = false` — making `get_my_role()` return null so every policy denies, even for an already-open session — and bans the account in Auth so the credential stops working. Two layers, because each covers the other's gap. The delete button is gone: it left the auth account alive and, worse, `tareas.asignado_id` has `on delete set null`, so it silently unassigned every task the person had closed.
 - **Credentials in `.env`**: never committed to the repository.
 - **User creation without session replacement**: the user creation feature uses a Supabase client with `persistSession: false` so the Admin's active session is not overwritten.
+- **Volunteer autonomy, atomic concurrency and secure handover log**: `reclamar_tarea_abierta` and `iniciar_rutina_voluntario` (`autonomia_y_bitacora_turno.sql`) require active accounts (`get_my_role() is not null`) to block deactivated users. Claiming open tasks uses `SELECT ... FOR UPDATE` to avoid double-claim race conditions when two volunteers click simultaneously in the shelter. The `bitacora_turnos` table protects reads and inserts via `get_my_role() is not null`, while deletion is restricted to the note author or an Administrator. All project error codes (`PT001`–`PT021`) are explicitly covered in `src/lib/errores.js`.
 
 ---
 
