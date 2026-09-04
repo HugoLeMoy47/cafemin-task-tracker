@@ -93,7 +93,7 @@ function formatearFecha(iso) {
  * vez de una y media.
  * The board's card took ~380 px; clamping gets four tasks per screen.
  */
-function TarjetaMovil({ tarea, esPrivilegiado, onAvanzar, onEditar, onReabrir, ocupada }) {
+function TarjetaMovil({ tarea, esPrivilegiado, onAvanzar, onSoltar, onEditar, onReabrir, ocupada }) {
   const [expandido, setExpandido] = useState(false)
   const vencida =
     tarea.fecha_limite && tarea.estado !== 'Hecho' && new Date(tarea.fecha_limite) < new Date()
@@ -186,6 +186,29 @@ function TarjetaMovil({ tarea, esPrivilegiado, onAvanzar, onEditar, onReabrir, o
           </button>
         )}
 
+        {/* El inverso de tomar del pool. Solo aparece donde tiene sentido: una
+            tarea que ESTA persona tomó (`reclamada_en`) y todavía no empieza.
+            Sin él, equivocarse de tarjeta con el pulgar solo lo podía deshacer
+            un Gestor — y la tarea quedaba escondida del pool para todos.
+            The inverse of claiming; without it a mis-tap needed a coordinator. */}
+        {!esPrivilegiado &&
+          onSoltar &&
+          tarea.reclamada_en &&
+          tarea.estado === 'Pendiente' && (
+            <button
+              type="button"
+              onClick={() => onSoltar(tarea)}
+              disabled={ocupada}
+              className="min-h-[44px] px-3 rounded-lg border border-gray-200 dark:border-gray-600
+                text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700
+                disabled:opacity-50 transition-colors
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              title="Devolver esta tarea al pool para que la tome alguien más"
+            >
+              ↩ Soltar
+            </button>
+          )}
+
         {tarea.estado === 'Hecho' && esPrivilegiado && (
           <button
             type="button"
@@ -221,6 +244,7 @@ export default function ListaMovil({
   conteos,
   esPrivilegiado,
   onAvanzar,
+  onSoltar,
   onEditar,
   onReabrir,
   ocupada,
@@ -272,6 +296,7 @@ export default function ListaMovil({
               tarea={tarea}
               esPrivilegiado={esPrivilegiado}
               onAvanzar={onAvanzar}
+              onSoltar={onSoltar}
               onEditar={onEditar}
               onReabrir={onReabrir}
               ocupada={ocupada === tarea.id}

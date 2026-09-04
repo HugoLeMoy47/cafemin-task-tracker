@@ -126,10 +126,24 @@ function medir() {
   /* 1. La página no debe salirse de la pantalla. */
   const desborde = Math.max(0, doc.scrollWidth - doc.clientWidth)
 
-  /* 2. Nada interactivo por debajo de 44 px. */
+  /* 2. Nada interactivo por debajo de 44 px.
+        Lo que se mide es el blanco REAL, no la caja del control: una casilla
+        o un radio de 16 px envueltos en una <label> de 44 px son un patrón
+        correcto y accesible —se toca la etiqueta entera—, y contarlos como
+        defecto haría que la prueba gritara en falso. Una prueba que grita en
+        falso se deja de leer, y entonces deja de servir para lo que sí es.
+        The effective target is the wrapping <label>, not the 16 px control. */
+  const cajaEfectiva = (e) => {
+    const propia = e.getBoundingClientRect()
+    const etiqueta = e.closest('label')
+    if (!etiqueta) return propia
+    const caja = etiqueta.getBoundingClientRect()
+    return caja.height >= propia.height ? caja : propia
+  }
+
   const tactiles = [...document.querySelectorAll('button, a, select, input, textarea, [role="button"], summary')]
     .filter(visible)
-    .map((e) => { const c = e.getBoundingClientRect(); return { que: nombrar(e), w: Math.round(c.width), h: Math.round(c.height) } })
+    .map((e) => { const c = cajaEfectiva(e); return { que: nombrar(e), w: Math.round(c.width), h: Math.round(c.height) } })
     .filter((x) => x.w > 0 && x.h > 0 && (x.h < 44 || x.w < 44))
 
   /* 3. Texto HTML por debajo de 12 px.

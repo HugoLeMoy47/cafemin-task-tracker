@@ -23,6 +23,7 @@ import { createRoot } from 'react-dom/client'
 import KanbanBoard from './components/KanbanBoard'
 import Reports from './components/Reports'
 import Login from './components/Login'
+import Ajustes from './components/Ajustes'
 import './index.css'
 
 const PERFILES = {
@@ -44,7 +45,9 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <main className="w-full max-w-5xl mx-auto px-4 py-6">
-        {vista === 'reportes' ? (
+        {vista === 'ajustes' ? (
+          <Ajustes />
+        ) : vista === 'reportes' ? (
           <Reports userProfile={perfil} />
         ) : (
           <KanbanBoard userProfile={perfil} onEdit={vista === 'kanban-admin' ? () => forzar((n) => n + 1) : undefined} />

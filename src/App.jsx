@@ -6,6 +6,7 @@ import KanbanBoard from './components/KanbanBoard'
 import TaskForm from './components/TaskForm'
 import UserManagement from './components/UserManagement'
 import CatalogManagement from './components/CatalogManagement'
+import Ajustes from './components/Ajustes'
 import TemplateManagement from './components/TemplateManagement'
 import Reports from './components/Reports'
 import UpdatePassword from './components/UpdatePassword'
@@ -229,6 +230,7 @@ export default function App() {
         )}
         {currentView === 'users' && isAdmin && <UserManagement />}
         {currentView === 'catalogs' && isAdmin && <CatalogManagement />}
+        {currentView === 'settings' && isAdmin && <Ajustes />}
         {currentView === 'templates' && (isAdmin || isGestor) && (
           <TemplateManagement userProfile={userProfile} />
         )}

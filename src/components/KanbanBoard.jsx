@@ -380,6 +380,34 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
     setMoviendo(null)
   }
 
+  /**
+   * Devolver al pool una tarea que se tomó por error.
+   *
+   * Va contra la RPC y no contra un `update` directo a propósito: quién puede
+   * soltar qué —solo lo propio, solo sin empezar, solo lo que uno mismo tomó y
+   * no lo que asignó la coordinación— es una regla de negocio, y en este
+   * proyecto esas viven en la base de datos.
+   *
+   * Goes through the RPC, not a direct update: who may drop what is a business
+   * rule, and in this project those live in the database.
+   */
+  async function soltarTarea(task) {
+    const previas = tasks
+    setDragError('')
+    setMoviendo(task.id)
+    // Se quita de la lista de inmediato: dejarla ahí mientras responde el
+    // servidor hace dudar de si el toque sirvió, y en un teléfono lento eso
+    // se traduce en un segundo toque.
+    setTasks((prev) => prev.filter((t) => t.id !== task.id))
+
+    const { error } = await supabase.rpc('soltar_tarea', { p_tarea_id: task.id })
+    if (error) {
+      setTasks(previas)
+      setDragError(mensajeDeError(error, 'No se pudo soltar la tarea. Intenta de nuevo.'))
+    }
+    setMoviendo(null)
+  }
+
   async function handleDragEnd({ active, over }) {
     setActiveTask(null)
     if (!over) return
@@ -526,10 +554,14 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
               <button
                 type="button"
                 onClick={() => setMostrarBitacora(true)}
-                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                /* En teléfono se esconde la palabra y queda solo el icono: sin
+                   `min-w-[44px]` el blanco medía 41 px de ancho. Y sin
+                   `aria-label` el botón se anuncia como «📝». */
+                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 min-h-[44px] min-w-[44px] justify-center rounded-lg transition-colors inline-flex items-center gap-1.5"
                 title="Ver y registrar notas de entrega de turno"
+                aria-label="Bitácora de turno"
               >
-                <span>📝</span>
+                <span aria-hidden="true">📝</span>
                 <span className="hidden sm:inline">Bitácora</span>
               </button>
             </>
@@ -538,7 +570,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
               <button
                 type="button"
                 onClick={() => setMostrarIniciarTurno(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-3 min-h-[44px] rounded-lg transition-colors inline-flex items-center gap-1.5"
                 title="Comenzar jornada seleccionando un perfil de tareas"
               >
                 <span>🚀</span>
@@ -547,10 +579,14 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
               <button
                 type="button"
                 onClick={() => setMostrarBitacora(true)}
-                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5"
+                /* En teléfono se esconde la palabra y queda solo el icono: sin
+                   `min-w-[44px]` el blanco medía 41 px de ancho. Y sin
+                   `aria-label` el botón se anuncia como «📝». */
+                className="border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium px-3 min-h-[44px] min-w-[44px] justify-center rounded-lg transition-colors inline-flex items-center gap-1.5"
                 title="Ver y registrar notas de entrega de turno"
+                aria-label="Bitácora de turno"
               >
-                <span>📝</span>
+                <span aria-hidden="true">📝</span>
                 <span className="hidden sm:inline">Bitácora</span>
               </button>
             </>
@@ -610,6 +646,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
           }}
           esPrivilegiado={isPrivileged}
           onAvanzar={(tarea, avance) => moverTarea(tarea, avance.destino)}
+          onSoltar={soltarTarea}
           onEditar={onEdit}
           onReabrir={handleReopen}
           ocupada={moviendo}

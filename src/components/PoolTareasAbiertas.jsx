@@ -69,9 +69,13 @@ export default function PoolTareasAbiertas({ onTareaTomada }) {
         className="w-full min-h-[48px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
         aria-expanded={abierto}
       >
-        <div className="flex items-center gap-2.5">
-          <span className="text-xl">🖐</span>
-          <div>
+        {/* `min-w-0` en el contenedor y en el bloque de texto: sin ellos, con
+            la letra del sistema al 130% el título no puede encoger y empuja
+            26 px fuera de la pantalla. Medido por npm run test:movil.
+            Without min-w-0 the title cannot shrink and pushes 26 px off. */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-xl shrink-0" aria-hidden="true">🖐</span>
+          <div className="min-w-0">
             <h3 className="text-xs sm:text-sm font-bold text-blue-950 dark:text-blue-100">
               Tareas disponibles en el albergue ({tareasAbiertas.length})
             </h3>

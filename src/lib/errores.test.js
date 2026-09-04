@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import {
   mensajeDeError,
@@ -188,5 +189,45 @@ describe('autenticación ya identificada / authenticated auth errors', () => {
 
   it('sesión expirada pide volver a entrar', () => {
     expect(mensajeDeError({ code: 'session_expired' }, 'respaldo')).toMatch(/sesión/i)
+  })
+})
+
+describe('cobertura contra las migraciones / coverage against the migrations', () => {
+  /**
+   * Esta prueba no comprueba un mensaje: comprueba que no falte ninguno.
+   *
+   * Lee los archivos de migración REALES, saca cada `errcode = 'PTxxx'` que
+   * lanzan, y exige que el traductor tenga una entrada para todos. Es la
+   * prueba que no se puede quedar obsoleta: quien agregue una regla nueva en
+   * SQL y olvide su texto en español rompe esto, en vez de descubrirlo un
+   * voluntario que ve un código en pantalla.
+   *
+   * Reads the REAL migration files and requires a message for every PT code
+   * they raise — so adding a rule without its text fails here, not in a
+   * volunteer's face.
+   */
+  const dir = new URL('../../supabase/migrations/', import.meta.url)
+  const archivos = readdirSync(dir).filter((f) => f.endsWith('.sql'))
+
+  const codigos = new Set()
+  for (const f of archivos) {
+    const sql = readFileSync(new URL(f, dir), 'utf8')
+    for (const m of sql.matchAll(/errcode\s*=\s*'(PT\d{3})'/g)) codigos.add(m[1])
+  }
+
+  it('encontró códigos en las migraciones / found codes in the migrations', () => {
+    expect(codigos.size).toBeGreaterThan(15)
+  })
+
+  it('cada código lanzado tiene mensaje / every raised code has a message', () => {
+    const sinMensaje = [...codigos].filter((c) => !REGLAS_DEL_PROYECTO[c]).sort()
+    expect(sinMensaje).toEqual([])
+  })
+
+  it('ningún mensaje sobra / no message without a rule', () => {
+    // Al revés: un mensaje para un código que ya nadie lanza es texto muerto
+    // que alguien mantendrá creyendo que sirve.
+    const sinRegla = Object.keys(REGLAS_DEL_PROYECTO).filter((c) => !codigos.has(c)).sort()
+    expect(sinRegla).toEqual([])
   })
 })

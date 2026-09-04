@@ -19,7 +19,7 @@
  *
  * ── Lo que sí se muestra ──
  *
- * Los códigos PT001–PT005 son nuestros: los definimos en
+ * Los códigos PT001–PT022 son nuestros: los definimos en
  * `supabase/migrations/reglas_cierre_asignado.sql` con un texto pensado para
  * leerse. Ese sí pasa tal cual, y es la razón de que existan códigos en vez de
  * comparar cadenas.
@@ -46,8 +46,17 @@ export const REGLAS_DEL_PROYECTO = {
   PT011: 'La tarea no existe.',
   PT012: 'Esta tarea ya fue tomada por otra persona.',
   PT013: 'Solo se pueden tomar tareas en estado Pendiente.',
+  PT014:
+    'Ya tienes varias tareas tomadas sin empezar. Empieza o suelta alguna antes de tomar otra.',
+  PT015: 'Debes tener una cuenta activa.',
+  PT016: 'La tarea no existe.',
+  PT017: 'Esta tarea no es tuya.',
+  PT018: 'Ya empezaste esta tarea. Habla con quien coordina si necesitas soltarla.',
+  PT019:
+    'Esta tarea te la asignó quien coordina. Pídele a esa persona que la reasigne.',
   PT020: 'Debes tener una cuenta activa para iniciar una rutina.',
   PT021: 'El perfil o rutina no existe o no está activo.',
+  PT022: 'Ya iniciaste esta rutina hoy. Tus tareas están en el tablero.',
 }
 
 /**

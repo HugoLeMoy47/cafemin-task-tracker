@@ -102,5 +102,18 @@ from (
            select 1 from pg_proc
            where proname = 'iniciar_rutina_voluntario'
          )
+
+  union all
+
+  -- Detectada por la tabla de ajustes Y por el sello `reclamada_en`: la tabla
+  -- sola no prueba que el trigger sepa del pool, que es la mitad que arregla
+  -- el defecto por el que el pool rebotaba con PT001.
+  select 14, 'configuracion_y_pool_reversible.sql',
+         exists (select 1 from information_schema.tables
+                 where table_schema = 'public' and table_name = 'configuracion')
+         and exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'tareas'
+                       and column_name = 'reclamada_en')
+         and exists (select 1 from pg_proc where proname = 'soltar_tarea')
 ) t
 order by n;

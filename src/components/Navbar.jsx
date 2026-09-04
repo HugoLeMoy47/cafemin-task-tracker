@@ -34,6 +34,7 @@ export default function Navbar({ userProfile, currentView, setCurrentView, darkM
     { id: 'reports',   label: 'Reportes',  show: isAdmin || isGestor },
     { id: 'users',     label: 'Usuarios',  show: isAdmin },
     { id: 'catalogs',  label: 'Catálogos', show: isAdmin },
+    { id: 'settings',  label: 'Ajustes',   show: isAdmin },
   ].filter((i) => i.show)
 
   function navigate(id) {

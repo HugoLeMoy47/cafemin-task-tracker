@@ -26,7 +26,15 @@
 
 drop schema if exists auth cascade;
 drop schema if exists storage cascade;
-drop table if exists tareas, usuarios, categorias, areas_trabajo cascade;
+-- La lista tiene que crecer con el esquema: una tabla que no se borra aquí
+-- sobrevive entre corridas y la suite deja de ser reproducible — que es peor
+-- que fallar, porque el resultado depende de cuántas veces se corrió antes.
+-- A table missing from this list survives between runs and makes the suite
+-- non-reproducible, which is worse than failing.
+drop table if exists
+  tareas, usuarios, categorias, areas_trabajo,
+  bitacora_turnos, plantilla_tareas, plantillas_perfil, configuracion
+  cascade;
 drop function if exists get_my_role() cascade;
 drop function if exists handle_new_user() cascade;
 drop function if exists restrict_asignado_update() cascade;
@@ -92,6 +100,9 @@ end $$;
 \ir ../migrations/search_path_handle_new_user.sql
 \ir ../migrations/proteger_ultimo_administrador.sql
 \ir ../migrations/desactivacion_de_usuarios.sql
+\ir ../migrations/plantillas_perfil.sql
+\ir ../migrations/autonomia_y_bitacora_turno.sql
+\ir ../migrations/configuracion_y_pool_reversible.sql
 
 
 -- ---------------------------------------------------------------------------
