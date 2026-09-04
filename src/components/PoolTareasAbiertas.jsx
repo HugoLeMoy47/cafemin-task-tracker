@@ -55,10 +55,27 @@ export default function PoolTareasAbiertas({ onTareaTomada }) {
     setReclamandoId(null)
   }
 
-  // Si no hay tareas y no está cargando, no estorba en pantalla
-  if (!loading && tareasAbiertas.length === 0) {
-    return null
-  }
+  /*
+   * Antes, con el pool vacío, el panel entero desaparecía «para no estorbar».
+   * Es peor de lo que parece por dos razones.
+   *
+   * La primera es de aprendizaje: una función que solo se ve cuando ya hay
+   * algo que tomar es una función que nadie descubre. El voluntario que entra
+   * un martes tranquilo no sabe que existe, y el martes que sí hay trabajo
+   * libre tampoco lo busca, porque nunca supo que estaba ahí.
+   *
+   * La segunda es de confianza: un bloque que aparece y desaparece según el
+   * día se lee como una falla, no como un estado. Se ve especialmente mal
+   * cuando alguien está enseñando el sistema y el panel se esfuma a media
+   * explicación.
+   *
+   * Un panel vacío pero presente enseña las dos cosas: que la lista existe, y
+   * que hoy no hay nada — que es información, no ausencia de información.
+   *
+   * Hiding the panel when empty means nobody ever learns the feature exists,
+   * and a block that comes and goes reads as a bug rather than a state.
+   */
+  const vacio = !loading && tareasAbiertas.length === 0
 
   return (
     <div className="mb-6 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 shadow-xs overflow-hidden transition-all">
@@ -105,6 +122,13 @@ export default function PoolTareasAbiertas({ onTareaTomada }) {
             <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl">
               {exito}
             </div>
+          )}
+
+          {vacio && (
+            <p className="text-xs text-blue-800/80 dark:text-blue-200/80 py-3">
+              Ahora mismo no hay tareas libres. Cuando alguien de coordinación deje una sin
+              asignar, aparecerá aquí para que cualquiera la tome.
+            </p>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

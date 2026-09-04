@@ -118,7 +118,7 @@ function CardContent({ task }) {
   )
 }
 
-function DraggableCard({ task, isAdmin, isGestor, onEdit, onDelete, onReopen }) {
+function DraggableCard({ task, isAdmin, isGestor, onEdit, onDelete, onReopen, onSoltar }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     data: { task },
@@ -169,6 +169,26 @@ function DraggableCard({ task, isAdmin, isGestor, onEdit, onDelete, onReopen }) 
 
       <CardContent task={task} />
 
+      {/* Soltar, también en escritorio.
+          Se construyó primero solo para el teléfono y eso fue un error: un
+          coordinador que prueba desde su laptop no encontraba el botón y
+          concluía —con razón— que la función no existe. El inverso de una
+          acción tiene que estar donde está la acción.
+          Built for the phone only at first, which was a mistake: the inverse
+          of an action belongs wherever the action is. */}
+      {!isPrivileged && onSoltar && task.reclamada_en && task.estado === 'Pendiente' && (
+        <div className="mt-2 flex justify-end">
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onSoltar(task)}
+            className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            title="Devolver esta tarea al pool para que la tome alguien más"
+          >
+            ↩ Soltar
+          </button>
+        </div>
+      )}
+
       {isPrivileged && (
         <div className="mt-2 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
           <span>{task.asignado ? `👤 ${task.asignado.nombre_completo}` : ''}</span>
@@ -187,7 +207,7 @@ function DraggableCard({ task, isAdmin, isGestor, onEdit, onDelete, onReopen }) 
   )
 }
 
-function KanbanColumn({ column, tasks, isAdmin, isGestor, onEdit, onDelete, onReopen }) {
+function KanbanColumn({ column, tasks, isAdmin, isGestor, onEdit, onDelete, onReopen, onSoltar }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -213,6 +233,7 @@ function KanbanColumn({ column, tasks, isAdmin, isGestor, onEdit, onDelete, onRe
             onEdit={onEdit}
             onDelete={onDelete}
             onReopen={onReopen}
+            onSoltar={onSoltar}
           />
         ))}
         {tasks.length === 0 && (
@@ -669,6 +690,7 @@ export default function KanbanBoard({ userProfile, onEdit, onNew }) {
                 onEdit={onEdit}
                 onDelete={handleDelete}
                 onReopen={handleReopen}
+                onSoltar={soltarTarea}
               />
             ))}
 
