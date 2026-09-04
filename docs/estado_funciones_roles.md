@@ -2,7 +2,7 @@
 
 > **Documento de Contextualización Funcional y de Producto**  
 > **Destinatario:** Agentes de IA y equipos encargados de redactar manuales de usuario, especificaciones funcionales, guías de onboarding y documentación operativa.  
-> **Fecha de corte:** Septiembre 2026  
+> **Fecha de corte:** 4 de septiembre de 2026  
 > **Stack tecnológico:** React 18 (Vite SPA) + Tailwind CSS + Supabase (PostgreSQL 16, GoTrue Auth, Private Storage Buckets, Realtime).
 
 ---
@@ -78,7 +78,7 @@ graph TD
 | Menú "Usuarios" (`users`) | ✅ Sí | ❌ No | ❌ No | Exclusivo Administrador. RLS bloquea lectura a otros. |
 | Menú "Catálogos" (`catalogs`) | ✅ Sí | ❌ No | ❌ No | Exclusivo Administrador. RLS bloquea escritura a otros. |
 | **Tablero de Tareas (Kanban / Lista Móvil)** | | | | |
-| Alcance de tareas visibles | Todas | Todas | Solo propias | RLS: `asignado_id = auth.uid()` para Asignado. |
+| Alcance de tareas visibles | Todas | Todas | Las suyas **y el pool** | RLS: el Asignado ve `asignado_id = auth.uid()`, **y además** las tareas sin asignar en estado *Pendiente* (política `Asignado see open tasks`). No ve las tareas asignadas a otras personas. |
 | Crear nueva tarea (`+ Nueva tarea`) | ✅ Sí | ✅ Sí | ❌ No | Abre `TaskForm`. El Asignado no ve el botón ni ruta. |
 | Editar detalles de tarea existente | ✅ Sí | ✅ Sí | ❌ No | Trigger `trg_restrict_asignado_update` (PT001). |
 | Eliminar tarea del sistema | ✅ Sí | ❌ No | ❌ No | Botón rojo con confirmación nativa. RLS delete policy. |
@@ -91,6 +91,20 @@ graph TD
 | **Móvil (< 640 px: `ListaMovil`)** | | | | |
 | Vista adaptada en columna única | ✅ Sí | ✅ Sí | ✅ Sí | Pestañas con conteo vivo y targets táctiles ≥44 px. |
 | Avance por botón explícito | ✅ Sí | ✅ Sí | ✅ Sí | Botón "Marcar en curso" / "Marcar hecha 📷". |
+| Soltar una tarea tomada del pool | — | — | ✅ Sí | RPC `soltar_tarea`. Solo lo propio, solo sin empezar, y solo lo que la persona tomó por su cuenta (PT017–PT019). |
+| **Autonomía del voluntariado** | | | | |
+| Ver el pool de tareas abiertas | ✅ Sí | ✅ Sí | ✅ Sí | `PoolTareasAbiertas.jsx`. Solo tareas sin asignar en *Pendiente*. |
+| Tomar una tarea del pool | ✅ Sí | ✅ Sí | ✅ Sí | RPC `reclamar_tarea_abierta` con `FOR UPDATE`: dos personas no pueden tomar la misma (PT012). |
+| Iniciar rutina desde una plantilla | ✅ Sí | ✅ Sí | ✅ Sí | RPC `iniciar_rutina_voluntario`. Una vez por plantilla y por día (PT022). |
+| **Bitácora de turno** | | | | |
+| Escribir una novedad | ✅ Sí | ✅ Sí | ✅ Sí | Cualquier cuenta activa deja recado al turno siguiente. |
+| Leer las novedades | ✅ Todas | ✅ Todas | ⚙️ Según ajuste | Coordinación siempre ve todo. Para el resto lo decide `bitacora_alcance` (ver §5.5). |
+| Borrar una novedad | ✅ Sí | Solo las suyas | Solo las suyas | Política `Author or Admin delete bitacora`. |
+| **Plantillas de perfil** | | | | |
+| Crear / editar / borrar plantillas | ✅ Sí | ✅ Sí | ❌ No | `TemplateManagement.jsx`. RLS restringe escritura a Admin y Gestor. |
+| Asignar una plantilla a una persona | ✅ Sí | ✅ Sí | ❌ No | `ModalAsignarPlantilla.jsx`. |
+| **Ajustes de operación** | | | | |
+| Menú "Ajustes" (`settings`) | ✅ Sí | ❌ No | ❌ No | `Ajustes.jsx`. RLS: solo Administrador escribe en `configuracion`. |
 | **Gamificación & Bienestar del Voluntario** | | | | |
 | Barra de progreso del turno (`ProgresoVoluntario`) | ❌ Oculta | ❌ Oculta | ✅ Visible | Muestra % del turno, total hechas y mensajes humanos. |
 | Modal de victoria (`CelebracionVictoria`) | ❌ Silenciado | ❌ Silenciado | ✅ Activo | Confeti sutil, mensaje de gratitud y autocierre (4s). |
@@ -137,8 +151,9 @@ stateDiagram-v2
 ```
 
 #### A. Acceso y Entorno Visual
-- **Vistas habilitadas:** Únicamente el Tablero de Tareas (`currentView = 'tasks'`). No ve en el menú las opciones de Reportes, Usuarios ni Catálogos.
-- **Filtro automático de información:** Solo puede consultar tareas donde `asignado_id` coincide exactamente con su identificador de autenticación.
+- **Vistas habilitadas:** Únicamente el Tablero de Tareas (`currentView = 'tasks'`). No ve en el menú Reportes, Usuarios, Catálogos, Plantillas ni Ajustes. Dentro del tablero sí alcanza el pool de tareas abiertas y la bitácora de turno, que son diálogos, no vistas del menú.
+- **Filtro automático de información:** Consulta las tareas donde `asignado_id` coincide con su identificador de autenticación, **y además** las tareas *sin asignar* que están en estado *Pendiente* — el pool. **Nunca** ve las tareas asignadas a otra persona.
+  > ⚠️ **Corrección respecto a versiones anteriores de este documento:** hasta la migración 12 el alcance era estrictamente `asignado_id = auth.uid()`. La política `Asignado see open tasks` lo amplió. Cualquier manual que afirme *«solo ve lo suyo»* sin matizar quedó desactualizado.
 - **Banner de Progreso Voluntario (`ProgresoVoluntario.jsx`):**
   - Ubicado en la parte superior del tablero.
   - Saluda al usuario por su primer nombre (*"¡Hola, María!"*).
@@ -343,6 +358,58 @@ Diseñado para auditorías de donantes, asambleas de la ONG y supervisión de lo
 
 ---
 
+### 5.5 Autonomía del Voluntariado: Pool, Plantillas y Bitácora
+
+Los tres módulos comparten una misma tesis de producto: **un voluntario no debería tener que esperar a que alguien le diga qué hacer.** En un albergue con voluntariado rotativo, la coordinación no siempre está disponible en el momento en que alguien llega dispuesto a ayudar.
+
+#### A. Pool de Tareas Abiertas (`PoolTareasAbiertas.jsx`)
+
+Tareas creadas **sin asignar** que cualquiera puede tomar.
+
+- **Qué se ve:** solo tareas con `asignado_id IS NULL` y estado *Pendiente*.
+- **Tomar** (`reclamar_tarea_abierta`): usa `SELECT ... FOR UPDATE` para bloquear la fila, de modo que dos personas que pulsan a la vez no puedan tomar la misma tarea (la segunda recibe `PT012`).
+- **Consecuencia que hay que entender:** tomar una tarea **la esconde del resto del equipo**, porque un Asignado solo ve lo suyo y lo que está libre. Quien toma muchas y no empieza deja el pool vacío sin haber hecho nada. De ahí los tres mecanismos siguientes.
+- **Soltar** (`soltar_tarea`): devuelve al pool una tarea tomada y aún no empezada. Es el inverso de tomar, y existe porque en un teléfono, con una mano, el pulgar se equivoca. **No se puede soltar** lo que asignó la coordinación (`PT019`): eso no es deshacer un error propio, es devolver trabajo que alguien dio, y esa conversación es con esa persona.
+- **Devolución automática** (`liberar_reclamos_vencidos`): lo tomado y no empezado vuelve al pool tras el plazo configurado. **No depende de `pg_cron`**: se ejecuta cuando alguien abre el pool, que es justo quien se beneficia de que lo abandonado ya esté libre.
+- **Tope opcional:** máximo de tareas tomadas-sin-empezar por persona. Apagado por omisión (`0`). Cuenta **solo lo auto-tomado**: si un Gestor asignó ocho tareas, eso no es acaparar el pool.
+
+> **`reclamada_en`** es la columna que distingue una tarea que un voluntario tomó de una que un Gestor asignó. Es lo que hace segura la devolución automática: lo asignado por coordinación **nunca** se desasigna solo.
+
+#### B. Plantillas de Perfil (`TemplateManagement.jsx`, `ModalIniciarTurno.jsx`)
+
+Un conjunto de tareas recurrentes agrupadas bajo un perfil de jornada (*"Turno de cocina — mañana"*).
+
+- **Quién las mantiene:** Administrador y Gestor.
+- **Cómo se usan:** el voluntario pulsa *"Iniciar turno"*, elige un perfil y el sistema le crea de golpe las tareas de esa rutina, ya asignadas a él.
+- **Idempotencia:** la misma plantilla no se puede iniciar dos veces el mismo día (`PT022`). El botón del modal ya evita el doble toque, pero la regla vive en la base de datos porque un reintento de red o dos aparatos abiertos bastaban para duplicar la jornada entera de alguien.
+
+#### C. Bitácora de Turno (`BitacoraTurno.jsx`)
+
+Notas en texto libre para entregar el turno: qué quedó pendiente, qué se acabó, qué hay que vigilar.
+
+- **Escribir:** cualquier cuenta activa.
+- **Borrar:** el autor o un Administrador. **No hay edición** — la bitácora es un registro que se agrega, no un documento que se corrige.
+- **Leer:** aquí está la decisión delicada, y por eso es configurable.
+
+#### D. Ajustes de Operación (`Ajustes.jsx`, tabla `configuracion`)
+
+Pantalla exclusiva del Administrador. Existe porque **dos decisiones de este producto no tienen una respuesta correcta que el código pueda elegir por el albergue.**
+
+| Ajuste | Valores | Por omisión | Qué decide |
+| :--- | :--- | :---: | :--- |
+| `bitacora_alcance` | `todas` · `area` · `propias` | `todas` | Quién lee las novedades. Coordinación y dirección **siempre** ven todo: leerlas es su trabajo. |
+| `bitacora_dias` | entero, `0` = sin límite | `30` | Cuántos días hacia atrás son visibles. |
+| `pool_tope_sin_empezar` | entero, `0` = sin tope | `0` | Máximo de tareas tomadas y no empezadas por persona. |
+| `pool_dias_para_soltar` | entero, `0` = nunca | `1` | Plazo tras el cual lo tomado y no empezado vuelve al pool. |
+
+**Por qué la bitácora es configurable y no una constante.** Son notas en texto libre sobre la operación diaria de un refugio para mujeres migrantes. Que las lea todo el voluntariado ayuda a coordinar; que las lea todo el voluntariado también significa que una persona que estará dos semanas puede leer todo el historial. Esa es una decisión de la dirección del albergue, no del sistema.
+
+**Cómo se presentan las advertencias.** El aviso va **junto al control** y **cambia según lo que se elija**: ampliar el alcance a *todas* muestra una advertencia ámbar sobre lo que eso implica; elegir *solo su área* muestra una nota gris explicando que el área se deduce de las tareas asignadas, y que quien aún no tiene ninguna no verá nada. Un aviso que dice lo mismo pase lo que pase se vuelve invisible en la segunda visita.
+
+> `get_config()` es `SECURITY DEFINER` a propósito: se invoca **dentro** de las políticas RLS de `bitacora_turnos`, y si leyera `configuracion` con los permisos de quien consulta, una política dependería de otra y PostgreSQL cortaría con un error de recursión a mitad de una consulta normal.
+
+---
+
 ## 6. Reglas de Integridad en Base de Datos (Códigos PT)
 
 El sistema implementa restricciones estrictas en PostgreSQL que lanzan códigos de error estandarizados si alguna solicitud viola las políticas de negocio:
@@ -355,6 +422,18 @@ El sistema implementa restricciones estrictas en PostgreSQL que lanzan códigos 
 | **`PT004`** | **Propiedad de la evidencia** | La ruta del archivo fotográfico debe iniciar con el identificador de la propia tarea (`{task_id}/...`). Impide reciclar una misma fotografía para cerrar múltiples tareas no relacionadas. | Trigger `restrict_asignado_update` |
 | **`PT005`** | **Prohibición de desvincular evidencia cerrada** | Una vez que una tarea con foto requerida está en estado *Hecho*, la evidencia no puede ser retirada ni sobreescrita con un valor nulo. | Trigger `restrict_asignado_update` |
 | **`PT006`** | **Protección del último Administrador** | Impide que el último Administrador del sistema sea degradado a otro rol o eliminado. Garantiza que la ONG siempre conserve capacidad de gestión sin depender de intervención técnica en base de datos. | Trigger `proteger_ultimo_administrador` |
+| **`PT007`–`PT009`** | **Gestión de accesos** | Solo un Administrador cambia el acceso de otra persona (`PT007`); nadie puede desactivar su propio acceso (`PT008`); la persona debe existir (`PT009`). | RPC `desactivar_usuario` / `reactivar_usuario` |
+| **`PT010`** | **Cuenta activa para tomar del pool** | Una cuenta desactivada no puede reclamar tareas, aunque su sesión siga abierta. | RPC `reclamar_tarea_abierta` |
+| **`PT011`** | **La tarea existe** | Protege contra identificadores inválidos o tareas ya eliminadas. | RPC `reclamar_tarea_abierta` |
+| **`PT012`** | **Una tarea, una persona** | Si dos voluntarios pulsan *tomar* a la vez, el bloqueo `FOR UPDATE` garantiza que solo uno gane y el otro reciba un mensaje claro en vez de un estado inconsistente. | RPC `reclamar_tarea_abierta` |
+| **`PT013`** | **Solo se toma lo pendiente** | No se puede reclamar una tarea ya en curso o cerrada. | RPC `reclamar_tarea_abierta` |
+| **`PT014`** | **Tope de tareas tomadas sin empezar** | Evita que una persona vacíe el pool acaparando tareas que no empieza. Cuenta solo lo auto-tomado, nunca lo que asignó coordinación. Configurable; apagado por omisión. | RPC `reclamar_tarea_abierta` |
+| **`PT015`–`PT018`** | **Condiciones para soltar** | Cuenta activa (`PT015`), la tarea existe (`PT016`), es propia (`PT017`) y aún no se empieza (`PT018`). | RPC `soltar_tarea` |
+| **`PT019`** | **No se devuelve lo que asignó coordinación** | Solo se puede soltar lo que la persona tomó por su cuenta. Devolver trabajo que un Gestor asignó es una conversación con esa persona, no una acción del sistema. | RPC `soltar_tarea` |
+| **`PT020`–`PT021`** | **Condiciones para iniciar rutina** | Cuenta activa (`PT020`) y plantilla existente y activa (`PT021`). | RPC `iniciar_rutina_voluntario` |
+| **`PT022`** | **Una rutina por día** | La misma plantilla no se inicia dos veces el mismo día. Sin esta regla, un reintento de red o dos aparatos abiertos duplicaban la jornada completa de una persona. | RPC `iniciar_rutina_voluntario` |
+
+> **El trigger `restrict_asignado_update` conoce el pool.** `reclamar_tarea_abierta` cambia `asignado_id`, que `PT001` prohíbe al rol Asignado — y aunque la función es `SECURITY DEFINER` y se salta RLS, **los triggers siguen disparando**. La migración 14 escribe en el trigger las dos transiciones permitidas —*de nadie a mí* y *de mí a nadie*, siempre en *Pendiente*— en vez de confiar en una bandera que indique por dónde llegó la escritura. Sigue prohibido asignar tareas a otra persona, quitarle trabajo a alguien y mover `reclamada_en` fuera de esas dos transiciones.
 
 ---
 
@@ -367,13 +446,20 @@ Al utilizar este documento para redactar manuales de usuario, especificaciones d
 - **Tono empático y claro:** Destacar el sentido de acompañamiento y labor comunitaria. Utilizar términos cotidianos (*"Marcar tarea en curso"*, *"Subir foto del trabajo terminado"*).
 - **Explicación del flujo de 3 pasos:** Explicar claramente que las tareas solo avanzan hacia adelante y que, si se cometió un error, deben comunicarlo a su Gestor de turno para que la reabra.
 - **Instrucciones sobre la cámara:** Explicar el aviso *"Toma la foto antes de retirarte del área"* para evitar tener que volver al espacio de trabajo.
+- **Cómo empezar la jornada sin esperar a nadie:** explicar el botón *"Iniciar turno"* (elegir el perfil de la jornada y recibir sus tareas de golpe) y el pool de *"Tareas disponibles en el albergue"*.
+- **Y cómo deshacerlo:** el botón *"↩ Soltar"* devuelve al pool una tarea tomada por error, **siempre que no se haya empezado**. Conviene decirlo explícitamente: es el miedo más común al tocar *tomar* por primera vez.
+- **La bitácora es para el turno siguiente,** no un chat. Sugerir qué se escribe ahí: lo que quedó pendiente, lo que se acabó, lo que hay que vigilar.
 
 ### 7.2 Si se redacta el "Manual del Coordinador de Turno (Gestor)"
 - **Enfoque en supervisión y balance:** Explicar el uso del tablero Kanban de escritorio con manija de arrastre (`⠿⠿`), el botón de reapertura de tareas (`↩ Reabrir`) y la creación ordenada de tareas con fecha límite y asignación equitativa.
 - **Buenas prácticas de evidencia:** Orientar sobre cuándo conviene activar la casilla de *Foto requerida* (p. ej. en almacén de medicamentos o inventario de donaciones) y cuándo es innecesaria para no entorpecer el ritmo operativo.
 - **Uso de reportes:** Guía paso a paso sobre cómo filtrar tareas por fecha o por área y cómo exportar a CSV para el relevo de guardia.
+- **Plantillas de perfil:** cómo armar una rutina de jornada y qué conviene que contenga. Advertir que una plantilla mal armada se multiplica por cada persona que la inicie.
+- **Dejar tareas en el pool a propósito:** crear una tarea *sin asignar* es una decisión de coordinación, no un descuido. Sirve para trabajo que cualquiera puede tomar.
 
 ### 7.3 Si se redacta el "Manual de Administración y Gobernanza"
 - **Gestión de personas:** Detallar cómo dar de alta a nuevos usuarios mediante contraseñas provisionales y cómo desactivar a personas que concluyeron su voluntariado preservando su autoría histórica.
 - **Mantenimiento de catálogos:** Explicar cómo mantener limpias las listas de Áreas y Categorías para que los reportes no se fragmenten con nombres duplicados o mal escritos.
 - **Seguridad de cuentas:** Recordar la importancia de mantener al menos dos cuentas con rol Administrador para garantizar redundancia operativa en el albergue.
+- **Ajustes de operación (§5.5.D):** es la sección con más consecuencias del manual de administración. Explicar que `bitacora_alcance` decide quién lee notas en texto libre sobre la operación diaria de un refugio, y que la elección correcta depende de qué se acostumbre escribir ahí. **No recomendar un valor en el manual**: describir qué implica cada uno y dejar la decisión a la dirección del albergue.
+- **El pool y sus frenos:** explicar por qué tomar una tarea la esconde del resto, y por qué la recomendación es empezar con el tope en `0` y subirlo solo si se observa acaparamiento real.

@@ -231,3 +231,34 @@ describe('cobertura contra las migraciones / coverage against the migrations', (
     expect(sinRegla).toEqual([])
   })
 })
+
+describe('la documentación de roles sigue el paso / role doc keeps up', () => {
+  /**
+   * `docs/estado_funciones_roles.md` existe para que alguien escriba los
+   * manuales a partir de él. Un dato viejo ahí no se queda ahí: se propaga a
+   * todos los manuales que se escriban después, y llega a una persona
+   * voluntaria como una instrucción equivocada.
+   *
+   * Ya pasó una vez: la matriz afirmaba que un Asignado «solo ve lo suyo»
+   * tres migraciones después de que dejara de ser cierto. Esta prueba no
+   * revisa la redacción —eso no se automatiza— sino que cada código PT que
+   * la base de datos puede lanzar esté nombrado en el documento.
+   *
+   * A stale fact in this file propagates into every manual written from it.
+   * This checks that every PT code the database can raise is named there.
+   */
+  const doc = readFileSync(new URL('../../docs/estado_funciones_roles.md', import.meta.url), 'utf8')
+
+  it('nombra cada código PT que existe / names every PT code', () => {
+    const ausentes = Object.keys(REGLAS_DEL_PROYECTO)
+      .filter((c) => !doc.includes(c))
+      .sort()
+    expect(ausentes).toEqual([])
+  })
+
+  it('no repite la afirmación que quedó obsoleta / no stale visibility claim', () => {
+    // La frase exacta que estuvo mal. Si alguien la reintroduce al reescribir
+    // la matriz, esto lo detiene.
+    expect(doc).not.toMatch(/Solo propias \| RLS: `asignado_id = auth\.uid\(\)`/)
+  })
+})
