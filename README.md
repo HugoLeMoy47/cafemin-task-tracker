@@ -65,6 +65,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 
 **3. Configurar Supabase**
 
+> **Atajo para un proyecto nuevo:** `supabase/setup_completo.sql` es el schema y las 13 migraciones ya concatenadas en este orden. Pégalo entero en el SQL Editor y ejecútalo, en vez de correr 14 archivos. Está **generado**: tras agregar una migración, agrégala a la lista `ir` de `supabase/tests/00_espejo.sql` (la única fuente del orden) y corre `npm run db:setup`.
+
 En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivos en orden:
 
 ```
@@ -79,6 +81,9 @@ En el **SQL Editor** de tu dashboard de Supabase, ejecuta los siguientes archivo
 9. supabase/migrations/search_path_handle_new_user.sql
 10. supabase/migrations/proteger_ultimo_administrador.sql
 11. supabase/migrations/desactivacion_de_usuarios.sql
+12. supabase/migrations/plantillas_perfil.sql
+13. supabase/migrations/autonomia_y_bitacora_turno.sql
+14. supabase/migrations/configuracion_y_pool_reversible.sql
 ```
 
 > `add_fecha_inicio.sql` reemplaza el trigger `trg_fecha_hecho` por `trg_marcas_de_tiempo`, que además sella cuándo una tarea entra a *En curso*. Sin esa marca solo se puede medir el tiempo total, que mezcla el tiempo que la tarea pasó esperando con el que costó hacerla.
@@ -201,6 +206,7 @@ npm run format        # Formatea con Prettier
 npm run format:check  # Verifica formato sin escribir
 npm run build:movil   # Arnés para la prueba de pantalla chica
 npm run test:movil    # Regresión en 320/360/412 px y con letra al 130% (necesita Playwright)
+npm run db:setup      # Regenera supabase/setup_completo.sql (schema + migraciones en orden)
 ```
 
 ### 🔒 Seguridad
@@ -415,6 +421,18 @@ La clave pública admite dos nombres: `VITE_SUPABASE_PUBLISHABLE_KEY` (clave nue
 2. Authentication → URL Configuration → *Site URL* y *Redirect URLs* apuntando a `https://cafemintt.freejolitos.consulting`.
 3. Crear las cuentas de demostración, una por rol, y sembrar datos ficticios.
 
+### 🔁 Mover la base a otro proyecto de Supabase
+
+Hecho en octubre de 2026 (de una cuenta de Supabase a otra, solo con datos de demostración). Para repetirlo:
+
+1. Crear el proyecto nuevo y pegar `supabase/setup_completo.sql` en el SQL Editor (ver «Configurar Supabase»).
+2. Authentication → Users → *Add user* con *Auto Confirm*: las seis cuentas demo (lista en `supabase/seeds/01_cuentas_demo.sql`). Luego correr los tres seeds en orden.
+3. Authentication → **URL Configuration** → *Site URL* y *Redirect URLs* = la URL pública del despliegue (más `http://localhost:5173` para trabajar en local). Sin esto el enlace de restablecer contraseña falla. Authentication → **SMTP Settings** con el SMTP propio (hoy Brevo).
+4. Cambiar `VITE_SUPABASE_URL` y la clave pública en el `.env` local **y** en las variables de build de Cloudflare, y volver a desplegar.
+
+> ⚠️ Las variables `VITE_*` se hornean al construir. Un despliegue o un `dist/` anterior sigue apuntando al proyecto viejo, y el navegador lo reporta como «CORS Failed, status null» (el dominio viejo ya no resuelve), no como un error de configuración. Si ves eso tras migrar, reconstruye.
+> Con datos reales habría que migrar además `auth.users`/`auth.identities` y copiar aparte el bucket `evidencias`; esta migración no lo hizo.
+
 ### 🔑 Restablecimiento de contraseña
 
 Con el registro público apagado, el alta la hace el Administrador — pero quien olvida su contraseña necesita recuperarla por su cuenta. El flujo está implementado:
@@ -499,6 +517,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 
 **3. Configure Supabase**
 
+> **Shortcut for a new project:** `supabase/setup_completo.sql` is the schema plus all 13 migrations concatenated in this order. Paste it whole into the SQL Editor instead of running 14 files. It is **generated**: after adding a migration, add it to the `ir` list in `supabase/tests/00_espejo.sql` (the single source of order) and run `npm run db:setup`.
+
 In the **SQL Editor** of your Supabase dashboard, run the following files in order:
 
 ```
@@ -513,6 +533,9 @@ In the **SQL Editor** of your Supabase dashboard, run the following files in ord
 9. supabase/migrations/search_path_handle_new_user.sql
 10. supabase/migrations/proteger_ultimo_administrador.sql
 11. supabase/migrations/desactivacion_de_usuarios.sql
+12. supabase/migrations/plantillas_perfil.sql
+13. supabase/migrations/autonomia_y_bitacora_turno.sql
+14. supabase/migrations/configuracion_y_pool_reversible.sql
 ```
 
 > `add_fecha_inicio.sql` replaces the `trg_fecha_hecho` trigger with `trg_marcas_de_tiempo`, which also stamps when a task enters *En curso*. Without that stamp only total time is measurable, which conflates waiting with working.

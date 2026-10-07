@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:movil": "vite build --config vite.harnessMovil.config.js",
-    "test:movil": "node pruebas/movil.mjs"
+    "test:movil": "node pruebas/movil.mjs",
+    "db:setup": "node supabase/scripts/generar_setup.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
